@@ -1,0 +1,34 @@
+{
+  "name": "event-booking",
+  "version": "0.0.1",
+  "description": "Practice to learn GraphQL, with React, Express and MongoDB",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon app.js"
+  },
+  "keywords": [
+    "react",
+    "graphql",
+    "express",
+    "mongodb",
+    "nodejs",
+    "authentication"
+  ],
+  "author": "Patricio Cardó",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "express-graphql": "^0.9.0",
+    "graphql": "^14.6.0",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^5.9.6",
+    "mongoose-autopopulate": "^0.12.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.2"
+  }
+}
