@@ -1,27 +1,17 @@
-const Event = require('../../models/event');
-const Booking = require('../../models/booking');
-
-const parsedTimestamps = (model) => ({
-  createdAt: (new Date(model._doc.createdAt)).toISOString(),
-  updatedAt: (new Date(model._doc.updatedAt)).toISOString()
-});
+import Event from '../../models/event';
+import Booking from '../../models/booking';
+import { IdInterface, RequestWithAuth } from '../../helpers/global-interfaces';
 
 const bookingResolvers = {
-  bookings: async (args, req) => {
+  bookings: async (args: any, req: RequestWithAuth) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
-      const bookings = await Booking.find();
-      return bookings.map(booking => {
-        return {
-          ...booking._doc,
-          ...parsedTimestamps(booking)
-        }
-      })
+      return await Booking.find();
     } catch(err) {
       throw err;
     }
   },
-  bookEvent: async (args, req) => {
+  bookEvent: async (args: {eventId: string}, req: RequestWithAuth) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingEvent = await Event.findById(args.eventId);
@@ -30,16 +20,12 @@ const bookingResolvers = {
         user: req.userId,
         event: existingEvent
       });
-      const result = await booking.save();
-      return {
-        ...result._doc,
-        ...parsedTimestamps(result)
-      }
+      return await booking.save();
     } catch(err) {
       throw err;
     }
   },
-  cancelBooking: async (args, req) => {
+  cancelBooking: async (args: {bookingId: string}, req: RequestWithAuth) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingBooking = await Booking.findById(args.bookingId);

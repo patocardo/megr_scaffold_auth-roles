@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 /*
 import Avatar from '@material-ui/core/Avatar';
 import Button from '@material-ui/core/Button';
@@ -16,9 +16,9 @@ import { makeStyles } from '@material-ui/core/styles';
 */
 import { validate } from 'email-validator';
 
-import parseResponseError from '../utils/parseResponseError';
+import { parseResponseError, parseGraphQLError} from '../utils/parseResponseError';
 
-function Wrapper(content) {
+function Wrapper(content: ReactNode) {
   return (
     <div>
       <h2>Sign In</h2>
@@ -31,20 +31,19 @@ export default function Login() {
   const [status, setStatus] = useState('loggedout');
   const [userData, setUserData] = useState({ email: '', password: '' });
   const [isValidEmail, setIsValidEmail] = useState(true);
-  const [responseError, setResponseError] = useState(null);
+  const [responseError, setResponseError] = useState<Array<any>|null>(null);
 
-  function handleEmail(evt) {
+  function handleEmail(evt: React.ChangeEvent<HTMLInputElement>) {
     const email = evt.target.value;
     setIsValidEmail(validate(email));
     setUserData({ ...userData, email });
   }
-  function handlePassword(evt) {
+  function handlePassword(evt: React.ChangeEvent<HTMLInputElement>) {
     const password = evt.target.value;
     setUserData({ ...userData, password });
   }
 
-  async function submit(evt) {
-    evt.preventDefault();
+  async function submit() {
     // if (!validate(userData.email) || userData.password.length < 4) return false;
     setStatus('submitting');
     const requestBody = {
@@ -57,10 +56,9 @@ export default function Login() {
         }
       `,
     };
-    let response = null;
+
     try {
-      console.log(requestBody);
-      response = await fetch('http://localhost:8000/graphql', {
+      const response = await fetch('http://localhost:8000/graphql', {
         method: 'POST',
         body: JSON.stringify(requestBody),
         headers: {
@@ -69,13 +67,18 @@ export default function Login() {
         },
       });
       const json = await response.json();
-      console.log(json);
-      setResponseError(parseResponseError(response));
+      const comesWithErrors = parseGraphQLError(json);
+      /*
+      Do all stuffs with token
+      setResponseError(comesWithErrors);
+       */
+
+      return json;
+
     } catch (err) {
       setResponseError(parseResponseError(err));
+      return null
     }
-
-    return response;
   }
 
   async function logout() {

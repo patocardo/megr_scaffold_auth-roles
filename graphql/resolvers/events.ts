@@ -1,10 +1,12 @@
-const Event = require('../../models/event');
-const User = require('../../models/user');
+import { Request } from "express";
+import Event, { IEvent, IEventInput } from '../../models/event';
+import User from '../../models/user';
+import { IdInterface, RequestWithAuth } from '../../helpers/global-interfaces';
 
 const eventResolvers = {
   events: () => Event.find(),
-  eventById: (args) => Event.find((evt) => args._id === evt._id),
-  createEvent: async (args, req) => {
+  eventById: (args: IdInterface) => Event.findById(args.id),
+  createEvent: async (args: {eventInput: IEventInput}, req: RequestWithAuth) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const event = new Event({
@@ -24,4 +26,4 @@ const eventResolvers = {
   }
 };
 
-module.exports = eventResolvers;
+export default eventResolvers;

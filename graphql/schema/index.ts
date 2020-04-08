@@ -1,4 +1,25 @@
-const { buildSchema, } = require('graphql');
+const { buildSchema } = require('graphql');
+import { Field, Int, Float, ObjectType } from "type-graphql";
+import EventType from './event-type';
+import UserType from './user-type';
+
+@ObjectType
+class Booking {
+  @Field()
+  _id: string
+
+  @Field(type => EventType)
+  event: EventType;
+
+  @Field(type => UserType)
+  user: UserType;
+
+  @Field()
+  createdAt: string;
+
+  @Flied()
+  updatedAt: string;
+}
 
 const schema = buildSchema(`
   type Booking {
@@ -63,4 +84,4 @@ const schema = buildSchema(`
   }
 `);
 
-module.exports = schema
+export default schema;
