@@ -1,15 +1,15 @@
 require('dotenv').config();
 
-import express, { Request, Response } from "express";
-const bodyParser = require ('body-parser');
+const express= require('express');
+const bodyParser = require('body-parser');
 const graphqlHttp = require('express-graphql');
 const mongoose = require('mongoose');
 const cors = require('cors');
 
-import validateEnv from './helpers/validateEnv';
-import schema from './graphql/schema/index';
-import resolvers from './graphql/resolvers/index';
-import isAuth from './middleware/is-auth';
+const isAuth = require('./middleware/is-auth');
+const validateEnv = require('./helpers/validate-env');
+const schema = require('./graphql/schema');
+const resolvers = require('./graphql/resolvers');
 
 validateEnv();
 
@@ -19,7 +19,7 @@ mongoose.connect(
   { useNewUrlParser: true, useUnifiedTopology: true }
 ).then(() => {
   app.listen(process.env.PORT);
-}).catch((err: any) => console.error(err));
+}).catch((err) => console.error(err));
 
 const app = express();
 
@@ -27,7 +27,7 @@ app.use(bodyParser.json());
 
 app.use(cors());
 
-app.get('/', (req: Request, res: Response, next: any) => {
+app.get('/', (req, res, next) => {
   res.send('Hola tipo');
 });
 

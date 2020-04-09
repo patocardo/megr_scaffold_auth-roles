@@ -1,14 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-import express ,{ Request, Response} from 'express';
-
-import Event from '../../models/event';
-import User, { IUserInput } from '../../models/user';
-
-import { RequestWithAuth } from '../../helpers/global-interfaces';
+const Event = require('../../models/event');
+const User = require('../../models/user');
 
 const userResolvers = {
-  users: (args: any, req: RequestWithAuth) => {
+  users: (args, req) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const users = User.find().select('-password');
@@ -17,7 +13,7 @@ const userResolvers = {
       throw err;
     }
   },
-  createUser: async (args: {userInput: IUserInput} , req: RequestWithAuth) => {
+  createUser: async (args , req) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingUser = await User.findOne({email: args.userInput.email});
@@ -33,7 +29,7 @@ const userResolvers = {
       throw err;
     }
   },
-  login: async ({email, password}: IUserInput) => {
+  login: async ({email, password}) => {
     const existingUser = await User.findOne({email: email});
     if(!existingUser) throw new Error('user does not exists');
     const hash = await bcrypt.hashSync(password, 12);

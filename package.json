@@ -2,16 +2,10 @@
   "name": "event-booking",
   "version": "0.0.1",
   "description": "Practice to learn GraphQL, with React, Express and MongoDB",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node --inspect=5858 -r ts-node/register ./app.ts",
-    "start:watch": "nodemon",
-    "start-old": "nodemon app.js",
-    "tsc": "tsc",
-    "dev": "ts-node-dev --respawn --transpileOnly ./app.ts",
-    "build:live": "nodemon --watch '**/*.ts' --exec 'ts-node' ./app.ts",
-    "prod": "tsc && node ./build/app.js"
+    "start": "nodemon"
   },
   "keywords": [
     "react",
@@ -24,9 +18,6 @@
   "author": "Patricio Cardó",
   "license": "ISC",
   "dependencies": {
-    "@types/express": "^4.17.4",
-    "@types/mongoose": "^5.7.9",
-    "@types/mongoose-autopopulate": "^0.10.0",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.19.0",
     "cors": "^2.8.5",
@@ -37,11 +28,7 @@
     "graphql": "^14.6.0",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.9.6",
-    "mongoose-autopopulate": "^0.12.1",
-    "reflect-metadata": "^0.1.13",
-    "ts-node-dev": "^1.0.0-pre.44",
-    "type-graphql": "^0.17.6",
-    "typescript": "^3.8.3"
+    "mongoose-autopopulate": "^0.12.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.2"

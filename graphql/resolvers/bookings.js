@@ -1,9 +1,8 @@
-import Event from '../../models/event';
-import Booking from '../../models/booking';
-import { IdInterface, RequestWithAuth } from '../../helpers/global-interfaces';
+const Event = require('../../models/event');
+const Booking = require('../../models/booking');
 
 const bookingResolvers = {
-  bookings: async (args: any, req: RequestWithAuth) => {
+  bookings: async (args, req) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       return await Booking.find();
@@ -11,7 +10,7 @@ const bookingResolvers = {
       throw err;
     }
   },
-  bookEvent: async (args: {eventId: string}, req: RequestWithAuth) => {
+  bookEvent: async (args, req) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingEvent = await Event.findById(args.eventId);
@@ -25,7 +24,7 @@ const bookingResolvers = {
       throw err;
     }
   },
-  cancelBooking: async (args: {bookingId: string}, req: RequestWithAuth) => {
+  cancelBooking: async (args, req) => {
     try {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingBooking = await Booking.findById(args.bookingId);

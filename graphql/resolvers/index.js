@@ -8,4 +8,4 @@ const resolvers = {
   ...bookingResolvers
 }
 
-export default resolvers;
+module.exports = resolvers;
