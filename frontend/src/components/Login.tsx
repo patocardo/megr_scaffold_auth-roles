@@ -104,7 +104,7 @@ export default function Login() {
   }
 
   async function submit() {
-    // if (!validate(userData.email) || userData.password.length < 4) return false;
+    if (!validate(userData.email) || userData.password.length < 4) return false;
     setStatus('submitting');
     const requestBody = {
       query: `
