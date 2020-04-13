@@ -1,6 +1,6 @@
 // simple array operations
 
-export default function shuffle(arr: Array<any>) {
+export default function shuffle(arr: Array<any>): Array<any> {
   let currentIndex = arr.length;
   const rtrnArr = [...arr];
   let temporaryValue;

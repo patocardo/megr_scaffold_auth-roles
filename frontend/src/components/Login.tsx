@@ -1,4 +1,4 @@
-import React, { useState, ReactNode } from 'react';
+import React, { useState, ReactNode, useContext } from 'react';
 import {
   Avatar,
   Button,
@@ -16,7 +16,9 @@ import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
 import { validate } from 'email-validator';
 
-import { parseResponseError, parseGraphQLError} from '../utils/parseResponseError';
+import { StateContext/*, DispatchContext*/ } from '../globals/contextElements';
+import { IError, logError } from '../globals/errorHandling';
+import { IcontextState } from '../globals/reducer';
 
 function Copyright() {
   return (
@@ -90,7 +92,7 @@ export default function Login() {
   const [status, setStatus] = useState('loggedout');
   const [userData, setUserData] = useState({ email: '', password: '' });
   const [isValidEmail, setIsValidEmail] = useState(true);
-  const [responseError, setResponseError] = useState<Array<any>|null>(null);
+  const [responseError, setResponseError] = useState<IError[]|boolean>(false);
   const classes = useStyles();
 
   function handleEmail(evt: React.ChangeEvent<HTMLInputElement>) {
@@ -102,43 +104,24 @@ export default function Login() {
     const password = evt.target.value;
     setUserData({ ...userData, password });
   }
+  const { state, signIn } = useContext(StateContext);
 
-  async function submit() {
+  async function submit(evt: React.MouseEvent) {
+    evt.preventDefault()
     if (!validate(userData.email) || userData.password.length < 4) return false;
     setStatus('submitting');
-    const requestBody = {
-      query: `
-        query {
-          login(email: "${userData.email}", password: "${userData.password}") {
-            userId
-            token
-          }
-        }
-      `,
-    };
-
     try {
-      const response = await fetch('http://localhost:8000/graphql', {
-        method: 'POST',
-        body: JSON.stringify(requestBody),
-        headers: {
-          'Content-type': 'application/json',
-          Accept: 'application/json',
-        },
-      });
-      const json = await response.json();
-      console.log('json', json);
-      /*
-      const comesWithErrors = parseGraphQLError(json);
-      Do all stuffs with token
-      setResponseError(comesWithErrors);
-       */
-
-      return json;
-
+      const answer = await signIn(userData);
+      if (Array.isArray(answer)) {
+        setResponseError(answer.map((err: IError) => err));
+        setStatus('loggedout');
+        return false;
+      }
+      setStatus('logged');
+      return true;
     } catch (err) {
-      setResponseError(parseResponseError(err));
-      return null
+      logError(err);
+      return false;
     }
   }
 
@@ -165,7 +148,7 @@ export default function Login() {
           <Typography component="h1" variant="h5">
             Sign in
           </Typography>
-          { responseError && responseError.length > 0 && (
+          { Array.isArray(responseError) && responseError.length > 0 && (
               <ul>
                 {responseError?.map((err) => (<li key={err.key}>{err.message}</li>))}
               </ul>
@@ -184,8 +167,8 @@ export default function Login() {
               autoFocus
               onChange={handleEmail}
               value={userData.email}
-              error={isValidEmail}
-              helperText={isValidEmail && 'Invalid email'}
+              error={!isValidEmail}
+              helperText={!isValidEmail && 'Invalid email'}
             />
             <TextField
               variant="outlined"
@@ -227,29 +210,6 @@ export default function Login() {
           </form>
         </React.Fragment>
       );
-      /*
-              <form action="">
-
-          <div>
-            <label>
-              <div>Email:</div>
-              <input onChange={handleEmail} type="text" value={userData.email}/>
-              {!isValidEmail && (
-              <div>Email adress is invalid</div>
-              )}
-            </label>
-          </div>
-          <div>
-            <label>
-              <div>Password:</div>
-              <input onChange={handlePassword} value={userData.password}/>
-            </label>
-          </div>
-          <div>
-            <button onClick={submit} type="button">Submit</button>
-          </div>
-        </form>
-       */
   }
 
 }

@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import clsx from 'clsx';
 import { NavLink } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, CssBaseline, useScrollTrigger, Button, IconButton,
-Drawer, List, ListItem, ListItemText } from '@material-ui/core';
+  Drawer, List, ListItem, ListItemText } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
 
-const targets = ['Users', 'Bookings', 'Events', 'Login'];
+import { StateContext } from '../globals/contextElements';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -45,12 +45,6 @@ const useStyles = makeStyles((theme: Theme) =>
   }),
 );
 
-/*
-      [theme.breakpoints.down('sm')]: {
-        display: 'none',
-      }
- */
-
 interface ElevationScrollProps {
   window?: () => Window,
   children?: React.ReactElement
@@ -74,6 +68,15 @@ function ElevationScroll(props: ElevationScrollProps) {
 
 export default function NavBar(props: ElevationScrollProps) {
   const { children } = props;
+  const { state } = useContext(StateContext);
+
+  const { loginInfo } = state;
+
+  const targets = loginInfo
+    ? [{label: 'Home', key:'login'}, {label: 'Users', key: 'users'}, {label: 'Bookings', key: 'bookings'}, {label: 'Events', key: 'events'}]
+    : [{label:'Login', key: 'login'}];
+
+
   const classes = useStyles();
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -94,17 +97,17 @@ export default function NavBar(props: ElevationScrollProps) {
       <ElevationScroll {...props}>
         <AppBar className={classes.root}>
           <Toolbar>
-            <IconButton edge="start" className={classes.menuButton} color="inherit" aria-label="menu">
-              <MenuIcon onClick={toggleDrawer(true)}/>
+            <IconButton edge="start" className={classes.menuButton} color="inherit" aria-label="menu"  onClick={toggleDrawer(true)}>
+              <MenuIcon />
             </IconButton>
             <Typography variant="h6" className={classes.title}>User-Event booking</Typography>
             <div className={classes.topMenu}>
               {targets.map((elm) =>
                 (
-                  <NavLink to={`/${elm.toLowerCase()}`} key={elm} className={classes.navlink}>
+                  <NavLink to={`/${elm.key}`} key={elm.key} className={classes.navlink}>
                     <Button color="primary" classes={{
                       root: classes.buttonRoot
-                    }}>{elm}</Button>
+                    }}>{elm.label}</Button>
                   </NavLink>
                 ))
               }
@@ -122,9 +125,9 @@ export default function NavBar(props: ElevationScrollProps) {
         >
           <List>
             {targets.map((elm, index) => (
-              <NavLink to={`/${elm.toLowerCase()}`} key={elm} className={classes.navlink}>
-                <ListItem button key={elm}>
-                  <ListItemText primary={elm} />
+              <NavLink to={`/${elm.key}`} key={elm.key} className={classes.navlink}>
+                <ListItem button>
+                  <ListItemText primary={elm.label} />
                 </ListItem>
               </NavLink>
             ))}
