@@ -18,10 +18,10 @@ const userResolvers = {
       if(!req.isAuth) throw new Error('not authenticated.');
       const existingUser = await User.findOne({email: args.userInput.email});
       if(existingUser) throw new Error('user already exists.');
-      const hashedPassword = await bcrypt.hash(args.userInput.password, 12);
+      const hash = await bcrypt.hash(args.userInput.password, 10);
       const user  = new User({
         email: args.userInput.email,
-        password: args.userInput.password,
+        password: hash,
       });
       const result = await user.save();
       return {...result._doc, password: null};
@@ -29,23 +29,37 @@ const userResolvers = {
       throw err;
     }
   },
-  login: async ({email, password}) => {
+  login: async ({email, password, remember}) => {
     const existingUser = await User.findOne({email: email});
     if(!existingUser) throw new Error('user does not exists');
-    const hash = await bcrypt.hashSync(password, 12);
-    const passMatch = await bcrypt.compare(existingUser.password, hash);
+    const passMatch = await bcrypt.compare(password, existingUser.password);
     if(!passMatch) throw new Error('incorrect password');
     const token = jwt.sign(
-      {userId: existingUser.id, email: existingUser.email},
-      'secretkey',
-      {expiresIn: '1h'}
+      {userId: existingUser.id, email: existingUser.email, remember},
+      process.env.JWT_SECRET,
+      {expiresIn: remember ? '7d' : '1h'}
     );
     return {
-      userId: existingUser.id,
       token: token,
       expiration: 1
     }
+  },
+  tokenIsAlive: ({token}) => {
+    try {
+      const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+      console.log(token, decodedToken);
+      return {
+        email: decodedToken.email
+      }
+    } catch (e) {
+      throw e;
+    }
+  },
+  /*
+  logout: async ({email}) => {
+    // TODO: service to remove all tokens linked to an email
   }
+  */
 }
 
 module.exports = userResolvers;

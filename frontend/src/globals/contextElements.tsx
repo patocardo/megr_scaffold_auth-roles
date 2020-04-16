@@ -1,29 +1,29 @@
-import React, { createContext, useReducer, ReactElement } from 'react';
+import React, { createContext, useReducer, useEffect, ReactElement } from 'react';
 
 import reducer, { initialContextState } from './reducer';
-import createActions, {IStateContext, defaultContext} from './actions';
+import createActions, {defaultContext} from './actions';
 
 export const StateContext = createContext(defaultContext);
 
-interface IProvider {
-  children: ReactElement | ReactElement[]
-}
-
-export default function Provider(props: IProvider){
+export default function useProvider() {
   const [ state, dispatch] = useReducer(reducer, initialContextState);
+  const consign = createActions(dispatch);
 
-  const actions = createActions(dispatch);
+  console.log('state', state);
 
-  return (
-    <StateContext.Provider value={{state, ...actions}}>
-      {props.children}
-    </StateContext.Provider>
-  )
+  const wrapper = (child: React.ReactElement) => {
+    return (<StateContext.Provider value={{state, dispatch, consign}}>
+      {child}
+    </StateContext.Provider>);
+  }
+  /*
+
+  useEffect(() => {
+    consign({type:'checkIsAlive'});
+  }, [consign]);
+
+*/
+  return { state, dispatch, consign, StateContext  }
+
 }
-
-/*
-    <DispatchContext.Provider value={dispatch}>
-    </DispatchContext.Provider>
-
- */
 

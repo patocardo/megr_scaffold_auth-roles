@@ -1,7 +1,3 @@
-import { createContext } from 'react';
-
-const SIGNED_IN = 'SIGNEDIN';
-const SIGNED_OUT = 'SIGNEDOUT';
 
 export interface IloginInfo {
   token: string;
@@ -11,62 +7,26 @@ export interface IcontextState {
   loginInfo: IloginInfo | null;
 }
 
-interface ISignInAction {
-  type: typeof SIGNED_IN
-  payload:  IcontextState
+export type ActionType = {
+  type: string,
+  payload?: IcontextState
 }
 
-interface ISignOutAction {
-  type: typeof SIGNED_OUT
-}
-
-export type ActionType = ISignInAction | ISignOutAction | undefined;
-/*
-
-function ISignIn(loginInfo: IloginInfo): ActionType {
-  return {
-    type: SIGNED_IN,
-    payload: {
-      loginInfo
-    }
-  }
-}
-
-function ISignOut(): ActionType {
-  return {
-    type: SIGNED_OUT
-  }
-}
-
-export type LoginType = {
-  token: string;
-  email: string;
-}
-export type StateType = {
-  loginInfo: LoginType | null;
-}
-
-type ActionType = {
-  type: 'SIGNEDIN' | 'SIGNEDOUT'
-  payload?: StateType
-}
-
-*/
+export type DispatchType = (action: ActionType) => any;
 
 export const initialContextState: IcontextState = {
   loginInfo: null
 }
 
+const objReducer: any = {
+  'SIGNEDOUT': (state: IcontextState, payload?: null) => ({...state, loginInfo: null}),
+  'SIGNEDIN': (state: IcontextState, payload: {loginInfo: IloginInfo}) => ({...state, ...payload})
+}
+
 
 function reducer(state = initialContextState, action: ActionType): IcontextState {
-  if (action) {
-    switch(action.type) {
-      case SIGNED_OUT: return {...state, loginInfo: null};
-      case SIGNED_IN: return {...state, ...action.payload }
-      default: return state;
-    }
-  }
-  return state;
+  if (!action || !({}).hasOwnProperty.call(objReducer, action.type)) return state;
+  return objReducer[action.type](state, action.payload);
 }
 
 export default reducer;

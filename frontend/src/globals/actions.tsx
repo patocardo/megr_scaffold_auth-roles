@@ -1,71 +1,132 @@
-import { ActionType, initialContextState, IcontextState } from './reducer';
-import { parseResponseError, parseGraphQLError, IError } from './errorHandling';
+import { initialContextState, IcontextState, DispatchType } from './reducer';
+import { parseResponseError, IError, hasErrors } from './errorHandling';
+import { graphQLPost } from '../utils/http';
 
-
-type DispatchType = (action: ActionType) => any;
-
-export interface IStateContext {
-  state: IcontextState,
-  signIn: (userData: IUserLogin) => Promise<boolean | IcontextState | IError[] > | boolean | IcontextState | IError[]
+type ConsignType = {
+  type: string,
+  payload?: any,
+  state?: IcontextState
 }
 
-export const defaultContext: IStateContext = {
+type CreateActionType = (action: ConsignType) => Promise<null | IcontextState | IError[] >;
+
+export type ContextValueType = {
+  state: IcontextState;
+  dispatch: DispatchType;
+  consign: CreateActionType
+}
+
+export const defaultContext: ContextValueType = {
   state: initialContextState,
-  signIn: (userData: IUserLogin) => false
+  dispatch: () => false,
+  consign: (action) => Promise.resolve(null)
 }
 
-export interface IUserLogin {
+
+type ConsignActionType = ConsignType & { dispatch: DispatchType };
+
+// logIn types
+
+export type UserLoginType = {
   email: string
   password: string
+  remember: boolean
 }
 
-export default function createActions(dispatch: DispatchType) {
-  return {
-    signIn: async (userData: IUserLogin) => {
+type LoginArgsType = ConsignActionType & { payload: UserLoginType };
 
-      const requestBody = {
-        query: `
-          query {
-            login(email: "${userData.email}", password: "${userData.password}") {
-              userId
-              token
-            }
-          }
-        `,
-      };
-      try {
+type ResponseToken = {
+  login: {
+    token: string
+  }
+}
 
-        const response = await fetch('http://localhost:8000/graphql', {
-          method: 'POST',
-          body: JSON.stringify(requestBody),
-          headers: {
-            'Content-type': 'application/json',
-            Accept: 'application/json',
-          },
-        });
-        const json = await response.json();
+// checkIsAlive
 
-        const comesWithErrors = parseGraphQLError(json);
+type ResponseCheckAlive = {
+  tokenIsAlive: {
+    email: string
+  }
+}
 
-        if (comesWithErrors) return comesWithErrors;
-
-        const loginInfo = {
-          token: json.data.login.token,
-          email: userData.email
+const objActions: any = {
+  logIn: async function(args: LoginArgsType): Promise<null | IcontextState | IError[]> {
+    const { email, password, remember }  = args.payload;
+    const cargo = `
+      query {
+        login(email: "${email}", password: "${password}", remember: ${remember}) {
+          token
         }
+      }
+    `;
+    try {
+      const data = await graphQLPost<IError[] | ResponseToken >(cargo);
+      if (data === null ) return null;
+      if (hasErrors(data)) return data as IError[];
 
-        dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
+      const token = (data as ResponseToken).login.token;
 
-        return { loginInfo };
+      const loginInfo = { token, email };
 
-      } catch (err) {
-        const errors = parseResponseError(err);
-        if(!errors) return false;
-        return errors;
+      if (remember) {
+        localStorage.setItem('token', token);
+      } else {
+        sessionStorage.setItem('token', token);
       }
 
+      args.dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
 
+      return { loginInfo };
+
+    } catch (err) {
+      return parseResponseError(err);
     }
+  },
+  checkIsAlive: async function(args: ConsignActionType): Promise<null | IcontextState | IError[]> {
+
+    const token = args.state?.loginInfo?.token || sessionStorage.getItem('token') || localStorage.getItem('token');
+    if (!token) return Promise.resolve(null);
+    const cargo = `
+      query {
+        tokenIsAlive(token: "${token}") {
+          email
+        }
+      }
+    `;
+
+    try {
+
+      const data = await graphQLPost<IError[] | ResponseCheckAlive >(cargo);
+      if (data === null ) return null;
+      if (hasErrors(data)) return data as IError[];
+
+      const { email } = (data as ResponseCheckAlive).tokenIsAlive;
+
+      const loginInfo = { token, email };
+
+      args.dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
+
+      return { loginInfo };
+
+    } catch (err) {
+      return parseResponseError(err);
+    }
+  },
+  logOut: async function(args: ConsignActionType): Promise<null | IcontextState | IError[]> {
+    const token = args.state?.loginInfo?.token || sessionStorage.getItem('token') || localStorage.getItem('token');
+    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
+    args.dispatch({ type: 'SIGNEDOUT'});
+    // TODO: service to allow disable tokens
+    const out = await Promise.resolve(null);
+    return null;
+  }
+
+}
+
+export default function createActions(dispatch: DispatchType): CreateActionType {
+  return (action: ConsignType) => {
+    return objActions[action.type]({...action, dispatch});
   }
 }
 

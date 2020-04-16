@@ -1,11 +1,19 @@
-import React, { Component, ReactElement } from 'react';
+import React, { ComponentType, ReactElement } from 'react';
 import keyGenerate from '../utils/string';
-import { GraphQLGeneric, GraphQLWithError, GraphQLWithData, ResponseType } from './types';
+import { GraphQLGeneric, ResponseType, GraphQLWithError } from './types';
 
 export interface IError {
   key: string
   message: string
   stack?: string
+  /* TODO: evaluate haw to return from server and UI:
+  loggable: boolean
+  public: boolean
+   */
+}
+
+export function hasErrors(value: any): boolean {
+  return (Array.isArray(value) && value.length > 0 && ({}).hasOwnProperty.call(value[0], 'key'));
 }
 
 export function parseResponseError(response: ResponseType): Array<IError> | null {
@@ -43,7 +51,7 @@ interface IPropsErrorBoundary {
 }
 
 export default function withErrorBoundary<CallerProps extends {}>(
-  CallerComponent: React.ComponentType<CallerProps>
+  CallerComponent: ComponentType<CallerProps>
 ) {
   type HocProps = {
     // pending

@@ -10,10 +10,10 @@ const eventResolvers = {
       const event = new Event({
         ...args.eventInput,
         date: new Date(args.eventInput.date),
-        creator: req.userId
+        creator: req.userData.userId
       });
       const createdEvent = await event.save();
-      const existingUser = await User.findById(req.userId);
+      const existingUser = await User.findById(req.userData.userId);
       if(!existingUser) throw new Error('creator user did not exists.');
       existingUser.createdEvents.push(event);
       const savedUser = await existingUser.save();

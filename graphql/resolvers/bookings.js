@@ -16,7 +16,7 @@ const bookingResolvers = {
       const existingEvent = await Event.findById(args.eventId);
       if(!existingEvent) throw new Error('unexistent event');
       const booking = new Booking({
-        user: req.userId,
+        user: req.userData.userId,
         event: existingEvent
       });
       return await booking.save();

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useReducer, useContext } from 'react';
+import React, { Suspense, lazy, useReducer, useEffect } from 'react';
 import {
   BrowserRouter,
   Route,
@@ -8,36 +8,42 @@ import {
 
 import NavBar from './components/Navbar';
 import withErrorBoundary from './globals/errorHandling';
-import Provider, { StateContext } from './globals/contextElements';
-import reducer, {initialContextState} from './globals/reducer';
+import { StateContext } from './globals/contextElements';
+import reducer, { initialContextState } from './globals/reducer';
+import createActions, {ContextValueType} from './globals/actions';
 
 function App() {
 
-  const { state } = useContext(StateContext);
+  const [ state, dispatch] = useReducer(reducer, initialContextState);
+  const consign = createActions(dispatch);
+  let contextValue: ContextValueType = {state, dispatch, consign};
+  useEffect(() => {
+    consign({type:'checkIsAlive'});
+  }, []);
 
   const { loginInfo } = state;
 
   const pageComps = loginInfo ? ['Users', 'Bookings', 'Events', 'Login'] : ['Login'];
 
   return (
-    <Provider>
-        <BrowserRouter>
-          <>
-            <NavBar />
-            <Suspense fallback={<div>Loading...</div>}>
-              <Switch>
-                <Redirect from="/" to="/login" exact />
-                {
-                  pageComps.map((page: string) => {
-                    const Compo = lazy(() => import('./components/' + page));
-                    return (<Route from={'/' + page} component={Compo} key={page} />);
-                  })
-                }
-              </Switch>
-            </Suspense>
-          </>
-        </BrowserRouter>
-    </Provider>
+    <StateContext.Provider value={contextValue}>
+      <BrowserRouter>
+        <>
+          <NavBar />
+          <Suspense fallback={<div>Loading...</div>}>
+            <Switch>
+              <Redirect from="/" to="/login" exact />
+              {
+                pageComps.map((page: string) => {
+                  const Compo = lazy(() => import('./components/' + page));
+                  return (<Route from={'/' + page} component={Compo} key={page} />);
+                })
+              }
+            </Switch>
+          </Suspense>
+        </>
+      </BrowserRouter>
+    </StateContext.Provider>
   );
 }
 

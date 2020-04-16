@@ -38,6 +38,14 @@ const schema = graphql.buildSchema(`
     expiration: Int!
   }
 
+  type AuthBackData {
+    email: String!
+  }
+
+  type SuccessData {
+    success: String!
+  }
+
   input UserInput {
     email: String!
     password: String
@@ -47,7 +55,8 @@ const schema = graphql.buildSchema(`
     events: [Event!]!
     users: [User!]!
     bookings: [Booking!]!
-    login(email: String!, password: String!): AuthData
+    login(email: String!, password: String!, remember: Boolean): AuthData
+    tokenIsAlive(token: String!): AuthBackData
   }
 
   type RootMutation {

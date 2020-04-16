@@ -7,12 +7,13 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const isAuth = require('./middleware/is-auth');
+const refreshToken = require('./middleware/refresh-token');
 const validateEnv = require('./helpers/validate-env');
 const schema = require('./graphql/schema');
 const resolvers = require('./graphql/resolvers');
 
 validateEnv();
-
+mongoose.set('useCreateIndex', true);
 mongoose.connect(
   `mongodb+srv://${process.env.MONGO_USER}:${process.env.MONGO_PASSWORD}` +
   `@cluster0-7czxt.mongodb.net/${process.env.MONGO_DB}?retryWrites=true&w=majority`,
@@ -32,10 +33,24 @@ app.get('/', (req, res, next) => {
 });
 
 app.use(isAuth);
+/*
+{
+  document,
+  variables,
+  operationName,
+  result,
+  context,
+}
+ */
+const extensions = ({ context }) => {
+  return {
+    newToken: context.newToken,
+  };
+};
 
 app.use('/graphql', graphqlHttp({
   schema: schema,
   rootValue: resolvers,
-  graphiql: true
+  graphiql: true,
+  extensions: extensions
 }));
-

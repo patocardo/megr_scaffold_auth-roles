@@ -1,4 +1,4 @@
-import React, { useState, ReactNode, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   Avatar,
   Button,
@@ -16,9 +16,9 @@ import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
 import { validate } from 'email-validator';
 
-import { StateContext/*, DispatchContext*/ } from '../globals/contextElements';
-import { IError, logError } from '../globals/errorHandling';
-import { IcontextState } from '../globals/reducer';
+import { StateContext } from '../globals/contextElements';
+import { IError, logError, hasErrors } from '../globals/errorHandling';
+import { UserLoginType } from '../globals/actions';
 
 function Copyright() {
   return (
@@ -64,36 +64,41 @@ const useStyles = makeStyles((theme: Theme) => createStyles({
   },
 }));
 
-function Wrapper(content: ReactNode) {
-  const classes = useStyles();
-  return (
-    <Grid container component="main" className={classes.root}>
-      <CssBaseline />
-      <Grid item xs={false} sm={4} md={7} className={classes.image} />
-      <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square>
-        <div className={classes.paper}>
-          <Avatar className={classes.avatar}>
-            <LockOutlinedIcon />
-          </Avatar>
-          {content}
-        </div>
-      </Grid>
-    </Grid>
-  );
-  return (
-    <div>
-      <h2>Sign In</h2>
-      {content}
-    </div>
-  );
-}
-
 export default function Login() {
   const [status, setStatus] = useState('loggedout');
-  const [userData, setUserData] = useState({ email: '', password: '' });
+  const [userData, setUserData] = useState<UserLoginType>({ email: '', password: '', remember: false });
   const [isValidEmail, setIsValidEmail] = useState(true);
   const [responseError, setResponseError] = useState<IError[]|boolean>(false);
+  const [ toSubmit, setToSubmit ] = useState(false);
+  const { state, consign } = useContext(StateContext);
   const classes = useStyles();
+  let internal = (<div></div>);
+
+  useEffect(() => {
+    if (toSubmit) {
+      setStatus('submitting');
+      (async() => {
+        if (!validate(userData.email) || userData.password.length < 4) return false;
+        try {
+          const answer = await consign({ type: 'logIn', payload: userData});
+          if (answer && answer as IError[] && hasErrors(answer)) {
+            // TODO: refine possible errors
+            setResponseError(answer as IError[]);
+            return false;
+          }
+          return true;
+        } catch (err) {
+          logError(err);
+          return false;
+        }
+        setToSubmit(false);
+      })();
+
+    } else {
+      const where = (state.loginInfo) ? 'logged' : 'loggedout';
+      setStatus(where);
+    };
+  }, [toSubmit]);
 
   function handleEmail(evt: React.ChangeEvent<HTMLInputElement>) {
     const email = evt.target.value;
@@ -104,36 +109,32 @@ export default function Login() {
     const password = evt.target.value;
     setUserData({ ...userData, password });
   }
-  const { state, signIn } = useContext(StateContext);
-
-  async function submit(evt: React.MouseEvent) {
-    evt.preventDefault()
-    if (!validate(userData.email) || userData.password.length < 4) return false;
-    setStatus('submitting');
-    try {
-      const answer = await signIn(userData);
-      if (Array.isArray(answer)) {
-        setResponseError(answer.map((err: IError) => err));
-        setStatus('loggedout');
-        return false;
-      }
-      setStatus('logged');
-      return true;
-    } catch (err) {
-      logError(err);
-      return false;
-    }
+  function handleRemember(evt: React.ChangeEvent<HTMLInputElement>) {
+    setUserData({ ...userData, remember: evt.target.checked });
   }
 
+  function submit(evt: React.MouseEvent) {
+    evt.preventDefault();
+    setToSubmit(true);
+  }
+/*
+  async function submit(evt: React.MouseEvent) {
+    evt.preventDefault()
+
+  }
+*/
   async function logout() {
     setStatus('loggedout');
   }
 
   switch (status) {
     case 'submitting':
-      return Wrapper(<div>Sending user&#39;s data</div>);
+      internal = (
+        <div>Sending user&#39;s data</div>
+      );
+      break;
     case 'logged':
-      return Wrapper(
+      internal = (
         <div>
           Welcome
           {
@@ -142,8 +143,9 @@ export default function Login() {
           <button type="button" onClick={logout}>Log out</button>
         </div>
       );
+      break;
     default:
-      return Wrapper(
+      internal = (
         <React.Fragment>
           <Typography component="h1" variant="h5">
             Sign in
@@ -184,7 +186,7 @@ export default function Login() {
               value={userData.password}
             />
             <FormControlLabel
-              control={<Checkbox value="remember" color="primary" />}
+              control={<Checkbox value="remember" color="primary" checked={userData.remember} onChange={handleRemember} />}
               label="Remember me"
             />
             <Button
@@ -212,4 +214,18 @@ export default function Login() {
       );
   }
 
+  return (
+    <Grid container component="main" className={classes.root}>
+      <CssBaseline />
+      <Grid item xs={false} sm={4} md={7} className={classes.image} />
+      <Grid item xs={12} sm={8} md={5} component={Paper} elevation={6} square>
+        <div className={classes.paper}>
+          <Avatar className={classes.avatar}>
+            <LockOutlinedIcon />
+          </Avatar>
+          {internal}
+        </div>
+      </Grid>
+    </Grid>
+  );
 }
