@@ -7,7 +7,6 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 
 const isAuth = require('./middleware/is-auth');
-const refreshToken = require('./middleware/refresh-token');
 const validateEnv = require('./helpers/validate-env');
 const schema = require('./graphql/schema');
 const resolvers = require('./graphql/resolvers');
@@ -33,15 +32,7 @@ app.get('/', (req, res, next) => {
 });
 
 app.use(isAuth);
-/*
-{
-  document,
-  variables,
-  operationName,
-  result,
-  context,
-}
- */
+
 const extensions = ({ context }) => {
   return {
     newToken: context.newToken,

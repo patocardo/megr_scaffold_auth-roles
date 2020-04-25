@@ -1,6 +1,8 @@
 import { initialContextState, IcontextState, DispatchType } from './reducer';
-import { parseResponseError, IError, hasErrors } from './errorHandling';
+import { parseResponseError, IError, hasErrors } from './error-handling';
 import { graphQLPost } from '../utils/http';
+import useGraphQLPost from '../utils/use-graphql-post';
+
 
 type ConsignType = {
   type: string,
@@ -8,7 +10,7 @@ type ConsignType = {
   state?: IcontextState
 }
 
-type CreateActionType = (action: ConsignType) => Promise<null | IcontextState | IError[] >;
+export type CreateActionType = (action: ConsignType) => Promise<null | IcontextState | IError[] >;
 
 export type ContextValueType = {
   state: IcontextState;
@@ -113,13 +115,13 @@ const objActions: any = {
     }
   },
   logOut: async function(args: ConsignActionType): Promise<null | IcontextState | IError[]> {
-    const token = args.state?.loginInfo?.token || sessionStorage.getItem('token') || localStorage.getItem('token');
+    // const token = args.state?.loginInfo?.token || sessionStorage.getItem('token') || localStorage.getItem('token');
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
     args.dispatch({ type: 'SIGNEDOUT'});
     // TODO: service to allow disable tokens
     const out = await Promise.resolve(null);
-    return null;
+    return out;
   }
 
 }

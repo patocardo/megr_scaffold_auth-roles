@@ -1,35 +1,36 @@
 const graphql = require('graphql');
 
 const schema = graphql.buildSchema(`
-  type Booking {
+  type Role {
     _id: ID!
-    event: Event!
-    user: User!
-    createdAt: String!
-    updatedAt: String!
+    name: String!
+    description: String
   }
 
-  type Event {
+  type Action {
     _id: ID!
     title: String!
-    description: String!
-    price: Float!
-    date: String!
-    creator: User!
+    context: String
+    roles: [Role!]
   }
 
-  input EventInput {
-    title: String!
+  input RoleInput {
+    name: String!
     description: String!
-    price: Float!
-    date: String!
+  }
+
+  input ActionInput {
+    title: String!
+    context: String
+    roles: [String!]
   }
 
   type User {
     _id: ID!
+    name: String!
     email: String!
     password: String
-    createdEvents: [Event!]
+    roles: [Role!]
   }
 
   type AuthData {
@@ -47,23 +48,30 @@ const schema = graphql.buildSchema(`
   }
 
   input UserInput {
+    name: String!
     email: String!
     password: String
+    roles: [String!]!
   }
 
   type RootQuery {
-    events: [Event!]!
-    users: [User!]!
-    bookings: [Booking!]!
+    roles: [Role!]!
+    actions: [Action!]!
+    users(search: String, role: String): [User!]
     login(email: String!, password: String!, remember: Boolean): AuthData
     tokenIsAlive(token: String!): AuthBackData
   }
 
   type RootMutation {
-    createEvent(eventInput: EventInput): Event
+    createRole(roleInput: RoleInput): Role
+    updateRole(id: String!, roleInput: RoleInput): Role
+    removeRoles(ids: [String!]!): Boolean
+    createAction(actionInput: ActionInput): Action
+    updateAction(id: String!, actionInput: ActionInput): Action
+    removeActions(ids: [String!]!): Boolean
     createUser(userInput: UserInput): User
-    bookEvent(eventId: ID!): Booking!
-    cancelBooking(bookingId: ID!): Event!
+    updateUser(id: String!, userInput: UserInput): User
+    removeUsers(ids: String!): Boolean
   }
 
   schema {

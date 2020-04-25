@@ -1,44 +1,52 @@
-import React, { Suspense, lazy, useReducer, useEffect } from 'react';
+import React, { Suspense, lazy, useReducer, useEffect, useState } from 'react';
 import {
   BrowserRouter,
   Route,
-  Redirect,
+  // Redirect,
   Switch,
 } from 'react-router-dom';
 
-import NavBar from './components/Navbar';
-import withErrorBoundary from './globals/errorHandling';
-import { StateContext } from './globals/contextElements';
 import reducer, { initialContextState } from './globals/reducer';
-import createActions, {ContextValueType} from './globals/actions';
+import { StateContext } from './globals/context';
+import { useCheckIsAlive } from './utils/use-auth';
+
+import NavBar from './components/Navbar';
+import withErrorBoundary, { IError, logError } from './globals/error-handling';
+const Login = lazy(() => import('./components/Login'));
+const Users = lazy(() => import('./components/Users'));
+
+type PageCompsType = string[];
 
 function App() {
-
   const [ state, dispatch] = useReducer(reducer, initialContextState);
-  const consign = createActions(dispatch);
-  let contextValue: ContextValueType = {state, dispatch, consign};
+  const [ errors, setErrors ] = useState<IError[] | null>(null);
+
+  const checkIsAlive = useCheckIsAlive({ loginInfo: state.loginInfo, dispatch, setErrors });
+
   useEffect(() => {
-    consign({type:'checkIsAlive'});
+    checkIsAlive();
   }, []);
 
-  const { loginInfo } = state;
-
-  const pageComps = loginInfo ? ['Users', 'Bookings', 'Events', 'Login'] : ['Login'];
+  useEffect(() => {
+    if(errors) {
+      // TODO: improve this log;
+      errors.forEach(err => logError(err.message));
+    }
+  }, [errors]);
 
   return (
-    <StateContext.Provider value={contextValue}>
+    <StateContext.Provider value={{state, dispatch}}>
       <BrowserRouter>
         <>
           <NavBar />
           <Suspense fallback={<div>Loading...</div>}>
             <Switch>
-              <Redirect from="/" to="/login" exact />
               {
-                pageComps.map((page: string) => {
-                  const Compo = lazy(() => import('./components/' + page));
-                  return (<Route from={'/' + page} component={Compo} key={page} />);
-                })
+                state.loginInfo?.token && (
+                  <Route from='/users' component={Users} />
+                )
               }
+              <Route from='/login' component={Login} />
             </Switch>
           </Suspense>
         </>
@@ -48,9 +56,3 @@ function App() {
 }
 
 export default withErrorBoundary(App);
-
-/*
-    <DispatchContext.Provider value={dispatch}>
-    </DispatchContext.Provider>
-
- */

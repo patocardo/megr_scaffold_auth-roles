@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const autopopulate = require('mongoose-autopopulate');
 
-const bookingSchema = new mongoose.Schema({
+const actionSchema = new mongoose.Schema({
   event: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Event',
@@ -12,7 +12,14 @@ const bookingSchema = new mongoose.Schema({
     ref: 'User',
     autopopulate: { select: '-password'}
   },
-}, {timestamps: true});
-bookingSchema.plugin(autopopulate);
+  roles: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Role',
+      autopopulate: true
+    }
+  ]
+}/*, {timestamps: true}*/);
+actionSchema.plugin(autopopulate);
 
-module.exports = mongoose.model('Booking', bookingSchema);
+module.exports = mongoose.model('Action', actionSchema);

@@ -1,4 +1,4 @@
-import { parseGraphQLError, IError } from '../globals/errorHandling';
+import { parseGraphQLError, IError } from '../globals/error-handling';
 import { IcontextState, DispatchType } from '../globals/reducer';
 
 type optionsType = {
@@ -8,11 +8,7 @@ type optionsType = {
     [name: string]: string
   }
 }
-/*
-    'Content-type': string,
-    Accept: string,
-    Authorization?: string
- */
+
 export async function graphQLPost<T>(
   payload: string,
   context?: {
@@ -21,7 +17,7 @@ export async function graphQLPost<T>(
   }
 
 ): Promise<T | IError[] | null > {
-  const origin = window.location.hostname == 'localhost'
+  const origin = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
     : window.location.origin;
   const options: optionsType = {
@@ -41,7 +37,6 @@ export async function graphQLPost<T>(
   const comesWithErrors = parseGraphQLError(json);
 
   if (!comesWithErrors && context?.state?.loginInfo?.token) {
-    const fnQueried = Object.keys(json.data)[0];
     const token = json.extensions.newToken;
     const loginInfo = {...context?.state?.loginInfo, token};
 

@@ -6,7 +6,7 @@ import { AppBar, Toolbar, Typography, CssBaseline, useScrollTrigger, Button, Ico
 import MenuIcon from '@material-ui/icons/Menu';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
 
-import { StateContext } from '../globals/contextElements';
+import { StateContext } from '../globals/context';
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -67,7 +67,6 @@ function ElevationScroll(props: ElevationScrollProps) {
 }
 
 export default function NavBar(props: ElevationScrollProps) {
-  const { children } = props;
   const { state } = useContext(StateContext);
 
   const { loginInfo } = state;

@@ -1,7 +1,12 @@
 const mongoose = require('mongoose');
 const autopopulate = require('mongoose-autopopulate');
+const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching');
 
 const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
   email: {
     type: String,
     required: true,
@@ -11,14 +16,15 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  createdEvents: [
+  roles: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Event',
+      ref: 'Role',
       autopopulate: true
     }
   ]
 });
 userSchema.plugin(autopopulate);
+userSchema.plugin(mongoose_fuzzy_searching, {fields: ['name', 'email']});
 
 module.exports = mongoose.model('User', userSchema);

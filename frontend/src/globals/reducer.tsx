@@ -1,4 +1,4 @@
-
+// Initial state
 export interface IloginInfo {
   token: string;
   email: string;
@@ -7,6 +7,11 @@ export interface IcontextState {
   loginInfo: IloginInfo | null;
 }
 
+export const initialContextState: IcontextState = {
+  loginInfo: null
+}
+
+// Reducer
 export type ActionType = {
   type: string,
   payload?: IcontextState
@@ -14,15 +19,10 @@ export type ActionType = {
 
 export type DispatchType = (action: ActionType) => any;
 
-export const initialContextState: IcontextState = {
-  loginInfo: null
-}
-
 const objReducer: any = {
   'SIGNEDOUT': (state: IcontextState, payload?: null) => ({...state, loginInfo: null}),
   'SIGNEDIN': (state: IcontextState, payload: {loginInfo: IloginInfo}) => ({...state, ...payload})
 }
-
 
 function reducer(state = initialContextState, action: ActionType): IcontextState {
   if (!action || !({}).hasOwnProperty.call(objReducer, action.type)) return state;
