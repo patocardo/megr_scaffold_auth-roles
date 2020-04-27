@@ -1,7 +1,7 @@
 {
-  "name": "event-booking",
+  "name": "megr_scaffold_auth-roles",
   "version": "0.0.1",
-  "description": "Practice to learn GraphQL, with React, Express and MongoDB",
+  "description": "Scaffolding with Authentication and authorization, with MaterialUI and React in Typescript, GraphQL, Express and MongoDB with Mongoose",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -28,7 +28,8 @@
     "graphql": "^14.6.0",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.9.6",
-    "mongoose-autopopulate": "^0.12.1"
+    "mongoose-autopopulate": "^0.12.1",
+    "mongoose-fuzzy-searching": "^1.1.9"
   },
   "devDependencies": {
     "nodemon": "^2.0.2"

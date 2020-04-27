@@ -1,11 +1,11 @@
-const eventResolvers = require('./events');
+const roleResolvers = require('./roles');
 const userResolvers = require('./users');
-const bookingResolvers = require('./bookings');
+const authResolvers = require('./auths');
 
 const resolvers = {
-  ...eventResolvers,
+  ...roleResolvers,
   ...userResolvers,
-  ...bookingResolvers
+  ...authResolvers
 }
 
 module.exports = resolvers;

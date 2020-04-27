@@ -41,7 +41,7 @@ export function mapJSError(err: Error): IError {
   }
 }
 
-export function logError(err: Error| null, info?: object) {
+export function logError(err: Error| string | null, info?: object) {
   // TODO: create a service
   console.error(err, info);
 }

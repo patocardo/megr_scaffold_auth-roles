@@ -10,15 +10,16 @@ import {
   Paper,
   Box,
   Grid,
-  Typography } from '@material-ui/core';
+  Typography,
+  CircularProgress } from '@material-ui/core';
 import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
 import { validate } from 'email-validator';
 
-import { StateContext } from '../globals/contextElements';
-import { IError, logError, hasErrors } from '../globals/errorHandling';
-import { UserLoginType } from '../globals/actions';
+import { StateContext } from '../globals/context';
+import { IError, logError, hasErrors } from '../globals/error-handling';
+import useLogIn, { useLogOut } from '../utils/use-auth';
 
 function Copyright() {
   return (
@@ -40,8 +41,9 @@ const useStyles = makeStyles((theme: Theme) => createStyles({
   image: {
     backgroundImage: 'url(https://source.unsplash.com/random)',
     backgroundRepeat: 'no-repeat',
-    backgroundColor:
-      theme.palette.type === 'light' ? theme.palette.grey[50] : theme.palette.grey[900],
+    backgroundColor: theme.palette.type === 'light' 
+      ? theme.palette.grey[50]
+      : theme.palette.grey[900],
     backgroundSize: 'cover',
     backgroundPosition: 'center',
   },
@@ -66,39 +68,49 @@ const useStyles = makeStyles((theme: Theme) => createStyles({
 
 export default function Login() {
   const [status, setStatus] = useState('loggedout');
-  const [userData, setUserData] = useState<UserLoginType>({ email: '', password: '', remember: false });
+  const [userData, setUserData] = useState({ email: '', password: '', remember: false });
   const [isValidEmail, setIsValidEmail] = useState(true);
   const [responseError, setResponseError] = useState<IError[]|boolean>(false);
   const [ toSubmit, setToSubmit ] = useState(false);
-  const { state, consign } = useContext(StateContext);
+  const [ toOut, setToOut ] = useState(false);
+  const { state } = useContext(StateContext);
+  const { success, errors: loginErrors, logIn } = useLogIn();
+  const { success: out, errors: logoutErrors, logOut } = useLogOut();
   const classes = useStyles();
   let internal = (<div></div>);
 
   useEffect(() => {
-    if (toSubmit) {
-      setStatus('submitting');
-      (async() => {
-        if (!validate(userData.email) || userData.password.length < 4) return false;
-        try {
-          const answer = await consign({ type: 'logIn', payload: userData});
-          if (answer && answer as IError[] && hasErrors(answer)) {
-            // TODO: refine possible errors
-            setResponseError(answer as IError[]);
-            return false;
-          }
-          return true;
-        } catch (err) {
-          logError(err);
-          return false;
-        }
-        setToSubmit(false);
-      })();
+    if(state && state.loginInfo?.token) {
+      setStatus('logged');
+    }
+  }, []);
 
-    } else {
-      const where = (state.loginInfo) ? 'logged' : 'loggedout';
-      setStatus(where);
-    };
+  useEffect(() => {
+            // TODO: refine possible errors
+
+  }, [loginErrors]);
+
+  useEffect(() => {
+    if(success) setStatus('logged');
+  }, [success]);
+
+  useEffect(() => {
+    if(out) setStatus('logged');
+  }, [out]);
+
+  useEffect(() => {
+    if (toSubmit && validate(userData.email) && userData.password.length > 4) {
+      setStatus('submitting');
+      logIn(userData.email, userData.password, userData.remember);
+    }
   }, [toSubmit]);
+
+  useEffect(() => {
+    if (toOut) {
+      setStatus('leaving');
+      logOut();
+    }
+  }, [toOut]);
 
   function handleEmail(evt: React.ChangeEvent<HTMLInputElement>) {
     const email = evt.target.value;
@@ -117,30 +129,42 @@ export default function Login() {
     evt.preventDefault();
     setToSubmit(true);
   }
-/*
-  async function submit(evt: React.MouseEvent) {
-    evt.preventDefault()
 
-  }
-*/
-  async function logout() {
-    setStatus('loggedout');
+  function toLogout(evt: React.MouseEvent) {
+    evt.preventDefault();
+    setToOut(true);
   }
 
   switch (status) {
     case 'submitting':
       internal = (
-        <div>Sending user&#39;s data</div>
+        <div>
+          <CircularProgress />
+          <Typography component="h1" variant="h5">
+            Sending user&#39;s data
+          </Typography>
+        </div>
       );
       break;
     case 'logged':
       internal = (
         <div>
-          Welcome
-          {
-            userData.email
-          }
-          <button type="button" onClick={logout}>Log out</button>
+          <Typography component="h1" variant="h5">
+            Welcome
+          </Typography>
+          <Typography component="h1" variant="h4">
+            { state?.loginInfo?.email }
+          </Typography>
+          <Button
+            type="button"
+            fullWidth
+            variant="contained"
+            color="primary"
+            className={classes.submit}
+            onClick={toLogout}
+          >
+            Sign Oout
+          </Button>
         </div>
       );
       break;
