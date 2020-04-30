@@ -10,9 +10,30 @@
 5. Build upon it.
 
 ## TODOS
-- Error logging and normalization
-- Redaction of code conventions
-- Development of automated tests
+- Sistem
+  - Update menu
+  - Redirection login to private home page
+  - Landing page
+  - Multi-platform Icons
+  - Manifiest
+  - Performance optimization
+- CRUD
+  - individual save, create, delete
+  - individual route
+  - multiple delete
+  - pagination
+- Error handing:
+  - UI of displayable error
+  - API normalization
+  - log service
+- Documents:
+  - code conventions
+  - version notes
+  - plans
+- Tests
+  - Login
+  - User creation
+  - Role delete
 - Separate transpiling/buildings between environments
 
 ## Notes on aproaches
