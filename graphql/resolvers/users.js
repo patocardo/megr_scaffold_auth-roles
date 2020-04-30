@@ -9,11 +9,9 @@ const ErrorMessages = require('../../helpers/error-messages');
 const userResolvers = {
   users: async function (args, req) {
     try {
-/*       if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-      const authorized = await this.isAuthorized('users', req);
-      if(!authorized) throw new Error(ErrorMessages.notAuthorized.response); */
+      if(!this.isAuthorized('users', req)) throw new Error(ErrorMessages.notAuthorized.response);
+
       let users = [];
-      console.log(!!args.search, !!args.role);
       if (!!args.search) {
         users = (!!args.role)
           ? User.fuzzySearch(args.search, { roles: { $elemMatch: { $eq: args.role } } }).select('-password')
@@ -31,10 +29,8 @@ const userResolvers = {
   },
   userById: async function(args, req) {
     try {
-      if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-      const authorized = await this.isAuthorized('userById', req);
-      if(!authorized && req.userData.userId != args.id)
-        throw new Error(ErrorMessages.notAuthorized.response);
+      if(!this.isAuthorized('userById', req)) throw new Error(ErrorMessages.notAuthorized.response);
+
       return User.findById(args.id);
     } catch(err) {
       throw err;
@@ -42,9 +38,8 @@ const userResolvers = {
   },
   userCreate: async function(args, req) {
     try {
-      if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-      const authorized = await this.isAuthorized('userCreate', req);
-      if(!authorized) throw new Error(ErrorMessages.notAuthorized.response);
+      if(!this.isAuthorized('userCreate', req)) throw new Error(ErrorMessages.notAuthorized.response);
+
       const existingUser = await User.findOne({email: args.userInput.email});
       if(existingUser) throw new Error(ErrorMessages.duplicate('User').response);
       const hash = await bcrypt.hash(args.userInput.password, 10);
@@ -52,12 +47,7 @@ const userResolvers = {
         $in: args.userInput.roles.map(role => mongoose.Types.ObjectId(role))
       }});
       if (roles.length != args.userInput.roles.length) throw new Error(ErrorMessages.inconsistency.response);
-      const user  = new User({
-        name: args.userInput.name,
-        email: args.userInput.email,
-        password: hash,
-        roles
-      });
+      const user  = new User({...args.userInput, password: hash});
       const result = await user.save();
       return {...result._doc, password: null};
     } catch(err) {
@@ -66,9 +56,7 @@ const userResolvers = {
   },
   userUpdate: async function(args, req) {
     try {
-      if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-      const authorized = await this.isAuthorized('userUpdate', req);
-      if(!authorized) throw new Error(ErrorMessages.notAuthorized.response);
+      if(!this.isAuthorized('userUpdate', req)) throw new Error(ErrorMessages.notAuthorized.response);
       const existingUser = await User.findById(args.id);
       if(!existingUser) throw new Error(ErrorMessages.nonexistent('User').response);
       const newData = {...args.userInput};
@@ -88,8 +76,7 @@ const userResolvers = {
   },
   usersDelete: async (args, req) => {
     try {
-      if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-      const authorized = await this.isAuthorized('userUpdate', req);
+      if(!this.isAuthorized('usersDelete', req)) throw new Error(ErrorMessages.notAuthorized.response);
       const removedUsers = await User.remove({id: { $in: args.ids }});
       return removedUsers.deletedCount; 
     } catch (err) {

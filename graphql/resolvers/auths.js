@@ -24,8 +24,7 @@ const actionResolvers = {
   tokenIsAlive: function({token}) {
     try {
       const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-      console.log(token, decodedToken);
-      return {
+       return {
         email: decodedToken.email
       }
     } catch (e) {
@@ -33,38 +32,20 @@ const actionResolvers = {
     }
   },
   resolvers: async function(args, req) {
-    /*
-    if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
-    const user = await User.findById(req.userData.userId);
-    if(!user || !user.roles.some(role => role.name === 'sudo'))
-      throw new Error(ErrorMessages.notAuthorized.response);
-      */
+    if(!this.isAuthorized('resolvers', req, 'sudo')) throw new Error(ErrorMessages.notAuthorized.response);
     return Object.keys(this);
   },
-  isAuthorized: async function(resolverName, req) {
+  isAuthorized: async function(resolverName, req, only) {
     if(!req.isAuth) throw new Error(ErrorMessages.notAuthenticated.response);
     const user = await User.findById(req.userData.userId);
     if(!user) throw new Error(ErrorMessages.nonexistent('User').response);
     // TODO: change mapping to model search
-    const userWith = await User.findById(req.userData.userId).populate({path: 'roles', populate: { path: 'resolvers'}});
-    const rolesIn = user.populated('roles');
-    const role = await Role.findById('5ea6be2222f5364536fcfaaa');
-    // const resolvers = user.populated('resolvers');
-    // const roles = await Role.find({ _id: { $in: Array.from(user.populated('roles')) }})/* .populate('resolvers') */;
-    // const resolvers = roles.populated('resolvers');
-/*     await user.populate('roles').execPopulate();
-
-5ea6be2222f5364536fcfaaa
-
-    const rolesWith = await Role.find({ resolvers: resolverName }); */
-    console.log('userWith', userWith, 'roles', rolesIn, /*'resolvers', resolvers*/ 'role', role);
-    
-
-    // console.log('rolesWith', rolesWith, 'roles', roles, 'userWith', userWith);
-/*     return roles.some(role => {
+    if(only) {
+      return user.roles.some(role => role.name === only)
+    }
+    return user.roles.some(role => {
       return role.resolvers.includes(resolverName);
-    }); */
-    return true;
+    });
   }
 }
 

@@ -1,16 +1,9 @@
 import React, { useState, useContext, useEffect } from 'react';
 import {
   Container,
-  // Button,
-  // CssBaseline,
   TextField,
   FormControl,
-  // FormControlLabel,
-  // Checkbox,
-  // Link,
-  // Paper,
   Box,
-  // Grid,
   Typography,
   InputLabel,
   Select,
@@ -63,15 +56,18 @@ function makeDeleteExpression(ids: number[]): string {
   `;
 }
 
-type usersDataType = {
-  users: {
-    userId: string,
-    name: string,
-    email: string,
-    roles: {
-      name: string
-    }[]
+type userDataType = {
+  userId: string,
+  name: string,
+  email: string,
+  roles: {
+    roleId: string
+    name: string
   }[]
+}
+
+type usersDataType = {
+  users: userDataType[]
 }
 
 type userType = {
@@ -91,7 +87,7 @@ type rolesDataType = {
 }
 
 export default function Users() {
-  const [users, setUsers] = useState<userType[]>([]);
+  const [usersDisplay, setUsersDisplay] = useState<userType[]>([]);
   const [individual, setIndividual] = useState('');
   const [errors, setErrors] = useState<IError[] | null>(null);
   const [filter, setFilter] = useState(initialFilter);
@@ -148,7 +144,7 @@ export default function Users() {
           ...user,
           roles: user.roles.map(role => role.name).join(', ')
         }));
-        setUsers(newUsers)
+        setUsersDisplay(newUsers)
       }
       if( token && state.loginInfo?.email) {
         dispatch({ type: 'SIGNEDIN', payload: { loginInfo: { email: state.loginInfo.email, token} }});
@@ -173,13 +169,13 @@ export default function Users() {
 
   if (individual) {
     if (roles && roles.length) {
-      const singleData = users.find(user => user.userId === individual) || {
+      const singleData = usersData?.result?.data?.users.find(user => user.userId === individual) || {
         userId: '_',
         name: '',
         email: '',
         roles: []
       };
-      return <UserEdit roles={roles} {...singleData} setIndividual={setIndividual} />
+      return <UserEdit allRoles={roles} individualData={singleData} setIndividual={setIndividual} />
     } else {
       // TODO: waiting message
     }
@@ -224,7 +220,7 @@ export default function Users() {
           )
         }
       </Box>
-      <WithEmpty data={users}>
+      <WithEmpty data={usersDisplay}>
         {(rows: userType[]) => (
           <EnhancedTable
             headCells={headCells}
