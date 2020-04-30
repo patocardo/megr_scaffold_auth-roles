@@ -1,16 +1,9 @@
 import React, { useState, useContext, useEffect } from 'react';
 import {
   Container,
-  // Button,
-  // CssBaseline,
   TextField,
   FormControl,
-  // FormControlLabel,
-  // Checkbox,
-  // Link,
-  // Paper,
   Box,
-  // Grid,
   Typography,
   InputLabel,
   Select,
@@ -24,21 +17,8 @@ import useGraphQL from '../utils/use-graphql';
 import EnhancedTable from './EnhancedTable';
 import { IError } from '../globals/error-handling';
 import { StateContext } from '../globals/context';
-
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    formControl: {
-      margin: theme.spacing(1),
-      minWidth: 120,
-    },
-    selectEmpty: {
-      marginTop: theme.spacing(2),
-    },
-    marginedTop: {
-      marginTop: theme.spacing(2),
-    }
-  }),
-);
+import UserEdit from './UserEdit';
+import useFormStyles from '../utils/use-form-styles';
 
 type FilterType = {
   search: string,
@@ -76,15 +56,18 @@ function makeDeleteExpression(ids: number[]): string {
   `;
 }
 
-type usersDataType = {
-  users: {
-    userId: string,
-    name: string,
-    email: string,
-    roles: {
-      name: string
-    }[]
+type userDataType = {
+  userId: string,
+  name: string,
+  email: string,
+  roles: {
+    roleId: string
+    name: string
   }[]
+}
+
+type usersDataType = {
+  users: userDataType[]
 }
 
 type userType = {
@@ -94,15 +77,17 @@ type userType = {
   roles: string
 }
 
+type roleType = {
+  roleId: string,
+  name: string
+}
+
 type rolesDataType = {
-  roles: {
-    roleId: string,
-    name: string
-  }[]
+  roles: roleType[]
 }
 
 export default function Users() {
-  const [users, setUsers] = useState<userType[]>([]);
+  const [usersDisplay, setUsersDisplay] = useState<userType[]>([]);
   const [individual, setIndividual] = useState('');
   const [errors, setErrors] = useState<IError[] | null>(null);
   const [filter, setFilter] = useState(initialFilter);
@@ -111,7 +96,7 @@ export default function Users() {
   const rolesData = useGraphQL<rolesDataType>('post');
   const { WithEmpty } = useWithEmpty<userType>();
   const { state, dispatch } = useContext(StateContext);
-  const classes = useStyles();
+  const classes = useFormStyles();
 
   const headCells = [
     {
@@ -159,7 +144,7 @@ export default function Users() {
           ...user,
           roles: user.roles.map(role => role.name).join(', ')
         }));
-        setUsers(newUsers)
+        setUsersDisplay(newUsers)
       }
       if( token && state.loginInfo?.email) {
         dispatch({ type: 'SIGNEDIN', payload: { loginInfo: { email: state.loginInfo.email, token} }});
@@ -182,17 +167,20 @@ export default function Users() {
 
   const roles = rolesData?.result?.data?.roles || [];
 
-/*
   if (individual) {
-    const singleData = users.find(user => user.userId === individual) || {;
-      userId: '_',
-      name: '',
-      email: '',
-      roles: []
+    if (roles && roles.length) {
+      const singleData = usersData?.result?.data?.users.find(user => user.userId === individual) || {
+        userId: '_',
+        name: '',
+        email: '',
+        roles: []
+      };
+      return <UserEdit allRoles={roles} individualData={singleData} setIndividual={setIndividual} />
+    } else {
+      // TODO: waiting message
     }
-    return <SingleUser {...singleData} />
   }
-*/
+
   return (
     <Container>
       <Box>
@@ -232,7 +220,7 @@ export default function Users() {
           )
         }
       </Box>
-      <WithEmpty data={users}>
+      <WithEmpty data={usersDisplay}>
         {(rows: userType[]) => (
           <EnhancedTable
             headCells={headCells}

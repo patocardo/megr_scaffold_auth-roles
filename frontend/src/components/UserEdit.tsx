@@ -1,59 +1,126 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
-  // Button,
-  // CssBaseline,
+  Button,
   TextField,
   FormControl,
-  // FormControlLabel,
-  // Checkbox,
-  // Link,
-  // Paper,
+  FormControlLabel,
+  Checkbox,
   Box,
   Grid,
   Typography,
-  InputLabel,
+  Input,
   Select,
   MenuItem,
-  // CircularProgress
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText
 } from '@material-ui/core';
-import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
-import useCummulativeDelay from '../utils/use-delay';
-import useWithEmpty from '../utils/use-with-empty';
-import useGraphQL from '../utils/use-graphql';
-import EnhancedTable from './EnhancedTable';
-import { IError } from '../globals/error-handling';
-import { StateContext } from '../globals/context';
 import { validate } from 'email-validator';
+import useGraphQL from '../utils/use-graphql';
+import { IError } from '../globals/error-handling';
+import useFormStyles from '../utils/use-form-styles';
+import usePassword from '../utils/use-password';
 
-
-type UserEditInputType = {
+type RoleType = {
+  roleId: string,
+  name: string
+}
+type UserType = {
   userId: string,
   name: string,
   email: string,
-  roles: {
+  roles: RoleType[]  
+}
+type UserStateType = UserType & {password: string, passwordRepeat: string };
+
+type UserEditInputType = {
+  individualData: UserType,
+  allRoles: {
     roleId: string,
     name: string
-  }[]
+  }[],
+  setIndividual: (id: string) => void
 }
 
+type userByIdDataType = {
+  userById: UserType
+}
+const ITEM_HEIGHT = 48;
+const ITEM_PADDING_TOP = 8;
+const MenuProps = {
+  PaperProps: {
+    style: {
+      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+      width: 250,
+    },
+  },
+};
+
+const errorInputs = {
+  name: false,
+  email: false,
+  roles: false,
+  password: false,
+  passwordRepeat: false
+};
+
 export default function UserEdit(props: UserEditInputType) {
-  const {...initialData } = props;
-  const [ data, setData ] = useState(initialData);
-  const [ inputError, setInputError ] = useState({
-    name: false,
-    email: false,
-    roles: false
-  });
+  const {individualData, allRoles, setIndividual} = props;
+  const formClasses = useFormStyles();
+  const [ data, setData ] = useState<UserStateType>({...individualData, password: '', passwordRepeat: ''});
+  const [ changePass, setChangePass ] = useState(data.userId === '_');
+  const userData = useGraphQL<userByIdDataType>('post');
+  const [ status, setStatus ] = useState('input');
+  const [ missing, passValidate ] = usePassword();
+  const [ inputError, setInputError ] = useState(errorInputs);
 
   useEffect(() => {
-    setInputError({
+    const validation = {
       name: data.name.length < 4,
-      email: data.email.length > 0 && validate(data.email),
-      roles: data.roles.length === 0
-    })
-    if 
+      email: !validate(data.email),
+      roles: data.roles.length === 0,
+      password: false,
+      passwordRepeat: false
+    };
+    if (changePass){
+      validation.password = !passValidate(data.password);
+      validation.passwordRepeat = data.password !== data.passwordRepeat;
+    }
+    setInputError(validation); 
   }, [data]);
+
+  useEffect(() => {
+    if (status === 'sending') {
+      const resolver = (data.userId === '_') ? 'userCreate(' : `userUpdate(id: "${data.userId}", `;
+      const hasPass = (changePass) ? `, password: "${data.password}` : '';
+      const cargo = `mutation {
+        ${resolver}userInput: {
+          name: "${data.name}",
+          email: "${data.email}",
+          roles: [${data.roles.map(role => '"' + role.roleId + '"').join(', ')}]
+          ${hasPass}
+        }){
+          userId: _id
+          name
+          email
+          roles: {
+            roleId: _id
+            name
+          }
+        }
+      }`;
+      userData.fetchData(cargo, true);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if(userData.result?.data?.userById) {
+      setData({...userData.result.data.userById, password: '', passwordRepeat: ''});     
+    }
+
+  }, [userData.result]);
 
   function handleText(field: string) {
     return (evt: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,108 +128,186 @@ export default function UserEdit(props: UserEditInputType) {
     }
   }
 
+  function handleCheckPass(event: React.ChangeEvent<HTMLInputElement>) {
+    setChangePass(event.target.checked);
+  }
+  function isRoleSelected(roleId: string): boolean {
+    return data.roles.some(role => role.roleId === roleId);
+  }
+
+  function handleRolesChange(event: React.ChangeEvent<{ value: unknown }>){
+    console.log('event.target.value', event.target.value);
+    if(!data || !Array.isArray(data.roles) || !Array.isArray(allRoles)) return;
+    const ids = (event.target.value as string[]);
+    const roles = allRoles.filter(role => ids.includes(role.roleId));
+    setData({...data, roles});
+  }
+
+  function saveUser(/* evt: React.FormEvent<HTMLFormElement> */) {
+    // evt.preventDefault();
+    if (Object.values(inputError).some(ierr => ierr)) return false;
+    setStatus('sending');
+  }
+
+  function cancelEdit() {
+    setData({...individualData, password: '', passwordRepeat: ''});
+    setInputError(errorInputs);
+  }
+
+  if (status === 'sending') {
+    return (
+      <Container>  
+        <Grid container>
+          <Grid item xs={12} justify="center">
+            <Typography>Saving User's data</Typography>
+          </Grid>
+          <Grid item xs={12} justify="center">
+            <CircularProgress />
+          </Grid>
+        </Grid>
+      </Container>
+    );
+  }
+
   return (
-    <form action="" onSubmit={handleSubmit}>
-      <Typography variant="h6" gutterBottom>
-        User details
-      </Typography>
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            name="name"
-            label="Name"
-            value={data.name}
-            fullWidth
-            autoComplete="name"
-            onChange={handleText('name')}
-            error={inputError.name}
-            helperText={inputError.name && 'Put a valid name'}
-        />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            name="email"
-            label="Email"
-            fullWidth
-            autoComplete="email"
-            value={data.email}
-            onChange={handleText('email')}
-            error={inputError.email}
-            helperText={inputError.email && 'Invalid email address'}
+    <Container>
+      <form action="">
+        <Typography variant="h6" gutterBottom>
+          User details
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              name="name"
+              label="Name"
+              value={data.name}
+              fullWidth
+              autoComplete="name"
+              onChange={handleText('name')}
+              error={inputError.name}
+              helperText={inputError.name && 'Put a valid name'}
           />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              required
+              name="email"
+              label="Email"
+              fullWidth
+              autoComplete="email"
+              value={data.email}
+              onChange={handleText('email')}
+              error={inputError.email}
+              helperText={inputError.email && 'Invalid email address'}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Select
+              multiple
+              required
+              fullWidth
+              label="Roles"
+              value={data.roles.map(role => role.roleId)}
+              input={<Input />}
+              renderValue={(selected) => {
+                if(selected && !Array.isArray(selected)) return '';
+                return allRoles
+                  .filter(role => (selected as string[]).includes(role.roleId))
+                  .map(role => role.name).join(', ')
+              }}
+              onChange={handleRolesChange}
+              MenuProps={MenuProps}
+            >
+              {allRoles.map((role) => (
+                <MenuItem key={role.roleId} value={role.roleId}>
+                  <Checkbox checked={isRoleSelected(role.roleId)} />
+                  <ListItemText primary={role.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </Grid>
+          <Grid item xs={12}>
+            <FormControl className={formClasses.formControl}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={changePass}
+                    onChange={handleCheckPass}
+                    inputProps={{ 'aria-label': 'primary checkbox' }}
+                  />
+                }
+                label="Edit Password"
+              />
+            </FormControl>
+          </Grid>
+          {
+            changePass && (
+              <>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    required
+                    name="password"
+                    type="password"
+                    label="Password"
+                    fullWidth
+                    value={data.password}
+                    onChange={handleText('password')}
+                    error={inputError.password}
+                    helperText={inputError.password && 'Password does not fulfill rules'}
+                  />
+                  {
+                    inputError.password && (
+                      <>
+                        <Typography variant="h6">
+                          Password needs to fulfill the following rules
+                        </Typography>
+                        <div>
+                          <List dense={true}>
+                            {missing.map((rule) => (
+                              <ListItem>
+                                <ListItemText
+                                  primary={rule}
+                                />
+                              </ListItem>
+                            ))}
+                          </List>
+                        </div>
+                      </>
+                    )
+                  }
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    required
+                    name="passwordRepeat"
+                    type="password"
+                    label="Repeat Password"
+                    fullWidth
+                    value={data.password}
+                    onChange={handleText('passwordRepeat')}
+                    error={inputError.passwordRepeat}
+                    helperText={inputError.passwordRepeat && 'Both passwords must be equals'}
+                  />
+                </Grid>
+              </>
+            )
+          }
         </Grid>
         <Grid item xs={12}>
-          <FormControl className={classes.formControl}>
-          <InputLabel id="demo-mutiple-name-label">Name</InputLabel>
-          <Select
-            labelId="demo-mutiple-name-label"
-            id="demo-mutiple-name"
-            multiple
-            value={personName}
-            onChange={handleChange}
-            input={<Input />}
-            MenuProps={MenuProps}
-          >
-            {names.map((name) => (
-              <MenuItem key={name} value={name} style={getStyles(name, personName, theme)}>
-                {name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          <Box display="flex" justifyContent="flex-end">
+            <FormControl className={formClasses.formControl}>
+              <Button variant="contained" onClick={cancelEdit}>Cancel</Button>
+            </FormControl>
+            <FormControl className={formClasses.formControl}>
+              <Button variant="contained" color="primary" onClick={saveUser}>
+                Save
+              </Button>
+            </FormControl>
+          </Box>
         </Grid>
-        <Grid item xs={12}>
-          <TextField
-            id="address2"
-            name="address2"
-            label="Address line 2"
-            fullWidth
-            autoComplete="billing address-line2"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            id="city"
-            name="city"
-            label="City"
-            fullWidth
-            autoComplete="billing address-level2"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField id="state" name="state" label="State/Province/Region" fullWidth />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            id="zip"
-            name="zip"
-            label="Zip / Postal code"
-            fullWidth
-            autoComplete="billing postal-code"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <TextField
-            required
-            id="country"
-            name="country"
-            label="Country"
-            fullWidth
-            autoComplete="billing country"
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <FormControlLabel
-            control={<Checkbox color="secondary" name="saveAddress" value="yes" />}
-            label="Use this address for payment details"
-          />
-        </Grid>
-      </Grid>
-    </form>
+      </form>
+    </Container>
   );
 }
-*/
+

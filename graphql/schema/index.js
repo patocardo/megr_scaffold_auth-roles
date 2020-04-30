@@ -5,24 +5,13 @@ const schema = graphql.buildSchema(`
     _id: ID!
     name: String!
     description: String
-  }
-
-  type Action {
-    _id: ID!
-    title: String!
-    context: String
-    roles: [Role!]
+    resolvers: [String!]
   }
 
   input RoleInput {
     name: String!
     description: String!
-  }
-
-  input ActionInput {
-    title: String!
-    context: String
-    roles: [String!]
+    resolvers: [String!]
   }
 
   type User {
@@ -56,22 +45,19 @@ const schema = graphql.buildSchema(`
 
   type RootQuery {
     roles: [Role!]!
-    actions: [Action!]!
+    resolvers: [String!]!
     users(search: String, role: String): [User!]
     login(email: String!, password: String!, remember: Boolean): AuthData
     tokenIsAlive(token: String!): AuthBackData
   }
 
   type RootMutation {
-    createRole(roleInput: RoleInput): Role
-    updateRole(id: String!, roleInput: RoleInput): Role
-    removeRoles(ids: [String!]!): Boolean
-    createAction(actionInput: ActionInput): Action
-    updateAction(id: String!, actionInput: ActionInput): Action
-    removeActions(ids: [String!]!): Boolean
-    createUser(userInput: UserInput): User
-    updateUser(id: String!, userInput: UserInput): User
-    removeUsers(ids: String!): Boolean
+    roleCreate(roleInput: RoleInput): Role
+    roleUpdate(id: String!, roleInput: RoleInput): Role
+    rolesRemove(ids: [String!]!): Boolean
+    userCreate(userInput: UserInput): User
+    userUpdate(id: String!, userInput: UserInput): User
+    usersRemove(ids: [String!]): Int
   }
 
   schema {

@@ -1,5 +1,5 @@
 import React, { ReactElement } from 'react';
-import { Box } from '@material-ui/core';
+import { Box, Typography } from '@material-ui/core';
 
 type WithEmptyType<T> = {
   data: T[],
@@ -18,8 +18,11 @@ export default function useWithEmpty<T>(message?: string): useWEResultType<T> {
     if(data.length > 0) {
       return children(data);
     }
-    return (<Box>{message}</Box>)
-
+    return (
+      <Box display="flex" justifyContent="flex-end">
+        <Typography  variant="h6" gutterBottom>{message}</Typography>
+      </Box>
+    );
   }
 
   return { WithEmpty };

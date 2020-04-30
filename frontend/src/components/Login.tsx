@@ -99,7 +99,8 @@ export default function Login() {
   }, [out]);
 
   useEffect(() => {
-    if (toSubmit && validate(userData.email) && userData.password.length > 4) {
+    // TODO: usePassword
+    if (toSubmit && validate(userData.email) && userData.password.length > 3) {
       setStatus('submitting');
       logIn(userData.email, userData.password, userData.remember);
     }

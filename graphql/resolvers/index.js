@@ -1,11 +1,11 @@
 const roleResolvers = require('./roles');
 const userResolvers = require('./users');
-const actionResolvers = require('./actions');
+const authResolvers = require('./auths');
 
 const resolvers = {
   ...roleResolvers,
   ...userResolvers,
-  ...actionResolvers
+  ...authResolvers
 }
 
 module.exports = resolvers;

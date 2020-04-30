@@ -99,7 +99,7 @@ export default function NavBar(props: ElevationScrollProps) {
             <IconButton edge="start" className={classes.menuButton} color="inherit" aria-label="menu"  onClick={toggleDrawer(true)}>
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" className={classes.title}>User-Event booking</Typography>
+            <Typography variant="h6" className={classes.title}>Auth-Auth</Typography>
             <div className={classes.topMenu}>
               {targets.map((elm) =>
                 (

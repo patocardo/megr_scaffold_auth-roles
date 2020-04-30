@@ -10,6 +10,10 @@ const roleSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  resolvers: {
+    type: [String],
+    required: true
+  }
 });
 roleSchema.plugin(autopopulate);
 

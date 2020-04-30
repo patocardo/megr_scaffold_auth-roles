@@ -10,6 +10,7 @@
 5. Build upon it.
 
 ## TODOS
+- Error logging and normalization
 - Redaction of code conventions
 - Development of automated tests
 - Separate transpiling/buildings between environments
