@@ -18,7 +18,7 @@ import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 import { validate } from 'email-validator';
 
 import { StateContext } from '../globals/context';
-import { IError, logError, hasErrors } from '../globals/error-handling';
+import { ErrorType, logError, hasErrors } from '../globals/error-handling';
 import useLogIn, { useLogOut } from '../utils/use-auth';
 
 function Copyright() {
@@ -70,7 +70,7 @@ export default function Login() {
   const [status, setStatus] = useState('loggedout');
   const [userData, setUserData] = useState({ email: '', password: '', remember: false });
   const [isValidEmail, setIsValidEmail] = useState(true);
-  const [responseError, setResponseError] = useState<IError[]|boolean>(false);
+  const [responseError, setResponseError] = useState<ErrorType[]|boolean>(false);
   const [ toSubmit, setToSubmit ] = useState(false);
   const [ toOut, setToOut ] = useState(false);
   const { state } = useContext(StateContext);

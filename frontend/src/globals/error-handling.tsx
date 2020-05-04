@@ -2,10 +2,10 @@ import React, { ComponentType, ReactElement } from 'react';
 import keyGenerate from '../utils/string';
 import { GraphQLGeneric, ResponseType, GraphQLWithError } from './types';
 
-export interface IError {
-  key: string
-  message: string
-  stack?: string
+export type ErrorType = {
+  key: string,
+  message: string,
+  stack?: string,
   /* TODO: evaluate haw to return from server and UI:
   loggable: boolean
   public: boolean
@@ -16,7 +16,7 @@ export function hasErrors(value: any): boolean {
   return (Array.isArray(value) && value.length > 0 && ({}).hasOwnProperty.call(value[0], 'key'));
 }
 
-export function parseResponseError(response: ResponseType): Array<IError> | null {
+export function parseResponseError(response: ResponseType): Array<ErrorType> | null {
   if (response.status?.toString()[0] === '2') return null;
   return [{
     key: keyGenerate(response.statusText, 10),
@@ -24,7 +24,7 @@ export function parseResponseError(response: ResponseType): Array<IError> | null
   }];
 }
 
-export function parseGraphQLError(response: GraphQLGeneric): Array<IError> | null {
+export function parseGraphQLError(response: GraphQLGeneric): Array<ErrorType> | null {
   const {errors} = (response as GraphQLWithError);
   if (!errors || !Array.isArray(errors) || !errors.length) return null;
   return errors.map((err) => ({
@@ -33,7 +33,7 @@ export function parseGraphQLError(response: GraphQLGeneric): Array<IError> | nul
   }));
 }
 
-export function mapJSError(err: Error): IError {
+export function mapJSError(err: Error): ErrorType {
   return {
     key: keyGenerate(err.message, 10),
     message: err.message,
@@ -46,10 +46,6 @@ export function logError(err: Error| string | null, info?: object) {
   console.error(err, info);
 }
 
-interface IPropsErrorBoundary {
-  children: ReactElement
-}
-
 export default function withErrorBoundary<CallerProps extends {}>(
   CallerComponent: ComponentType<CallerProps>
 ) {
@@ -57,7 +53,7 @@ export default function withErrorBoundary<CallerProps extends {}>(
     // pending
   };
   type HocState = {
-    readonly errors: IError[] | null | undefined;
+    readonly errors: ErrorType[] | null | undefined;
   };
 
   return class Hoc extends React.Component<HocProps, HocState> {
@@ -84,7 +80,7 @@ export default function withErrorBoundary<CallerProps extends {}>(
       if (errors && errors.length) {
         return (
           <ul>
-            {errors.map(err => <li>{err.message}</li>)}
+            {errors.map(err => <li key={err.key}>{err.message}</li>)}
           </ul>
         );
       }

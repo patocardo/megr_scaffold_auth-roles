@@ -1,12 +1,12 @@
 import /*React, */{ useState, useEffect, useContext, useRef } from 'react';
-import { IError } from '../globals/error-handling';
+import { ErrorType } from '../globals/error-handling';
 import { StateContext } from '../globals/context';
 import { DispatchType, IloginInfo } from '../globals/reducer';
 import useGraphQL, { useGraphQL2 } from './use-graphql';
 
 
 type LogInReturnType = {
-  errors: IError[] | null,
+  errors: ErrorType[] | null,
   success: boolean,
   logIn: (email: string, password: string, remember: boolean) => void
 }
@@ -50,14 +50,13 @@ export default function useLogIn(): LogInReturnType {
 
       setSuccess(true);
     }
-
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
   return { success, errors, logIn}
 }
 
 type CheckIsAliveReturnType = {
-  errors: IError[] | null,
+  errors: ErrorType[] | null,
   email: string | null,
   checkIsAlive: () => void
 }
@@ -73,7 +72,7 @@ type CheckIsAliveType = () => void;
 type CheckIsAliveInputType = {
   loginInfo: IloginInfo | null,
   dispatch: DispatchType,
-  setErrors: (newErrors: IError[]) => void
+  setErrors: (newErrors: ErrorType[]) => void
 }
 
 export function useCheckIsAlive(args: CheckIsAliveInputType): CheckIsAliveType {
@@ -101,13 +100,14 @@ export function useCheckIsAlive(args: CheckIsAliveInputType): CheckIsAliveType {
 
       dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   return checkIsAlive;
 }
 
 type LogOutReturnType = {
-  errors: IError[] | null,
+  errors: ErrorType[] | null,
   success: boolean,
   logOut: () => void
 }

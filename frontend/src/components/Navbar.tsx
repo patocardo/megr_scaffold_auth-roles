@@ -72,7 +72,7 @@ export default function NavBar(props: ElevationScrollProps) {
   const { loginInfo } = state;
 
   const targets = loginInfo
-    ? [{label: 'Home', key:'login'}, {label: 'Users', key: 'users'}, {label: 'Bookings', key: 'bookings'}, {label: 'Events', key: 'events'}]
+    ? [{label: 'Home', key:'login'}, {label: 'Users', key: 'users'}, {label: 'Roles', key: 'roles'}]
     : [{label:'Login', key: 'login'}];
 
 

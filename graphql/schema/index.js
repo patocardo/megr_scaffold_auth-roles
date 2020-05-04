@@ -47,6 +47,7 @@ const schema = graphql.buildSchema(`
     roles: [Role!]!
     resolvers: [String!]!
     users(search: String, role: String): [User!]
+    userById(id: String): User
     login(email: String!, password: String!, remember: Boolean): AuthData
     tokenIsAlive(token: String!): AuthBackData
   }

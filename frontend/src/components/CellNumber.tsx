@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box } from '@material-ui/core';
-import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
+import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles({
   integer: {
@@ -30,7 +30,7 @@ export default function CellNumber(props: CellProps) {
     leftSide = trimmed;
     rightSide = '';
   } else {
-    const decimal = trimmed.toString().match(/([\.,]\d*)$/g);
+    const decimal = trimmed.toString().match(/([.,]\d*)$/g);
     leftSide = parseInt(trimmed).toString();
     rightSide = decimal ? decimal[0] : '';
 

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { parseGraphQLError, IError } from '../globals/error-handling';
+import { useState, useEffect, useContext } from 'react';
+import { parseGraphQLError, ErrorType } from '../globals/error-handling';
 import { IloginInfo } from '../globals/reducer';
 import { StateContext } from '../globals/context';
 
-type optionsType = {
+type ParamsType = {
   method: string,
   body: string,
   headers: {
@@ -11,23 +11,31 @@ type optionsType = {
   }
 }
 
+type OptionsType = {
+  params: ParamsType,
+  flags?: string | string[]
+}
+
 type GraphQLType<T> = {
   data: null | T,
-  errors: IError[] | null,
+  errors: ErrorType[] | null,
   fetchData: (expression: string, isAuth?: boolean) => void
 }
 
 const origin = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : window.location.origin;
-
-const baseOptions: optionsType = {
+const baseParams: ParamsType = {
   method: 'POST',
   body: '',
   headers: {
     'Content-type': 'application/json',
     Accept: 'application/json',
   },
+}
+const baseOptions: OptionsType = {
+  params: baseParams,
+  flags: 'base'
 };
 
 export type BaseResponseType = {
@@ -39,38 +47,50 @@ export type BaseResponseType = {
 
 type ResultType<T> = null |{
   data: T | null,
-  token?: string
+  token?: string,
+  flags?: string | string[]
 }
 
 type GraphQLResultType<T> = {
   result: ResultType<T>,
-  errors: IError[] | null,
-  fetchData: (expression: string, isAuth?: boolean) => void
+  errors: ErrorType[] | null,
+  fetchData: (expression: string, isAuth?: boolean, flags?: string | string[]) => void
 }
 
-export default function useGraphQL<T>(method: 'post' | 'get' | 'put' = 'post'): GraphQLResultType<T> {
-  const [ result, setResult ] = useState<ResultType<T>>(null);
-  const [ errors, setErrors ] = useState<IError[] | null>(null);
+export default function useGraphQL<T>(
+  method: 'post' | 'get' | 'put' = 'post', 
+  initial?: T, // starting value to set in state
+): GraphQLResultType<T> {
+  const startingValue = initial ? {data: initial} : null;
+  const [ result, setResult ] = useState<ResultType<T>>(startingValue);
+  const [ errors, setErrors ] = useState<ErrorType[] | null>(null);
   const { state } = useContext(StateContext);
   const [ options, setOptions ] = useState(baseOptions);
 
-
-  function fetchData(expression: string, isAuth?: boolean) {
-    const params = {
-      ...baseOptions,
+  function fetchData(
+    expression: string,
+    isAuth?: boolean,
+    flags?: string[] | string // values to return with result
+  ) {
+    const params: ParamsType = {
+      ...baseParams,
       body: JSON.stringify({ query: expression }),
       method: method.toUpperCase()
     };
     if (isAuth && state.loginInfo?.token) {
       params.headers.Authorization = `Bearer ${state.loginInfo.token}`;
     }
-    setOptions(params);
+    const choices: OptionsType = {params};
+    if (typeof flags !== 'undefined') {
+      choices.flags = flags;
+    }
+    setOptions(choices);
   }
 
   useEffect(() => {
     (async () => {
-      if (!options.body.length) return false;
-      const response = await fetch(`${origin}/graphql`, options);
+      if (!options.params.body.length) return false;
+      const response = await fetch(`${origin}/graphql`, options.params);
       const json = await response.json();
 
       const comesWithErrors = parseGraphQLError(json);
@@ -79,15 +99,12 @@ export default function useGraphQL<T>(method: 'post' | 'get' | 'put' = 'post'): 
         setErrors(comesWithErrors);
         return false;
       }
-
-      if (state.loginInfo?.token) {
-        const token = json.extensions.newToken;
-        setResult({ data: json.data, token });
-      } else {
-        setResult({ data: json.data });
-      }
+      const resObj: ResultType<T> = {data: json.data};
+      if (state.loginInfo?.token) resObj.token = json.extensions.newToken;
+      if (typeof options.flags != 'undefined') resObj.flags = options.flags;
+      setResult(resObj);
     })();
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options]);
 
   return { result, errors, fetchData };
@@ -97,7 +114,7 @@ type GraphQLFnType = (expression: string, loginInfo?: IloginInfo | null) => void
 
 type GraphQLInputType2<T> = {
   // setData: (newData: T) => void,
-  setErrors: (newErrors: IError[]) => void,
+  setErrors: (newErrors: ErrorType[]) => void,
   method?: 'post' | 'get' | 'put'
 }
 
@@ -111,11 +128,11 @@ export function useGraphQL2<T>(args: GraphQLInputType2<T>): GraphQL2ReturnType<T
   // const { setData, setErrors, method = 'post'} = args;
   const { setErrors, method = 'post'} = args;
   const [ data, setData ] = useState<T | null>(null)
-  const [ options, setOptions ] = useState(baseOptions);
+  const [ options, setOptions ] = useState(baseParams);
 
   function fetchData(expression: string, loginInfo?: IloginInfo | null) {
-    const params = {
-      ...baseOptions,
+    const params: ParamsType = {
+      ...baseParams,
       body: JSON.stringify({ query: expression }),
       method: method.toUpperCase()
     };
@@ -140,7 +157,7 @@ export function useGraphQL2<T>(args: GraphQLInputType2<T>): GraphQL2ReturnType<T
 
       setData(json.data);
     })();
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options]);
 
   return { data, fetchData};

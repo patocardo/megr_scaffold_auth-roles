@@ -74,10 +74,11 @@ const userResolvers = {
       throw err;
     }
   },
-  usersDelete: async (args, req) => {
+  usersRemove: async function(args, req) {
     try {
       if(!this.isAuthorized('usersDelete', req)) throw new Error(ErrorMessages.notAuthorized.response);
-      const removedUsers = await User.remove({id: { $in: args.ids }});
+      const removedUsers = await User.deleteMany({'_id': { $in: args.ids }});
+      if (removedUsers.ok !== 1) throw new Error(ErrorMessages.failed('remove users').response);
       return removedUsers.deletedCount; 
     } catch (err) {
       throw err;

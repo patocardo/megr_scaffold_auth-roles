@@ -1,5 +1,5 @@
-import { createContext } from 'react';
-
+import { createContext, useContext } from 'react';
+import { Route, Redirect } from 'react-router';
 import { initialContextState, IcontextState, DispatchType } from './reducer';
 
 export type ContextValueType = {
@@ -13,3 +13,4 @@ export const defaultContext: ContextValueType = {
 }
 
 export const StateContext = createContext(defaultContext);
+

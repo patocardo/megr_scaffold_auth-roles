@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useHistory, useParams } from 'react-router-dom';
 import {
   Container,
   Button,
@@ -13,40 +14,45 @@ import {
   Select,
   MenuItem,
   CircularProgress,
-  List,
-  ListItem,
-  ListItemText
+  ListItemText,
 } from '@material-ui/core';
+import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import { validate } from 'email-validator';
 import useGraphQL from '../utils/use-graphql';
-import { IError } from '../globals/error-handling';
+import { ErrorType, hasErrors } from '../globals/error-handling';
 import useFormStyles from '../utils/use-form-styles';
-import usePassword from '../utils/use-password';
+import BannerAlert from './BannerAlert';
+import PasswordInput from './PasswordInput';
 
-type RoleType = {
-  roleId: string,
-  name: string
-}
 type UserType = {
   userId: string,
   name: string,
   email: string,
-  roles: RoleType[]  
+  roles: string[]  
 }
 type UserStateType = UserType & {password: string, passwordRepeat: string };
 
-type UserEditInputType = {
-  individualData: UserType,
-  allRoles: {
-    roleId: string,
-    name: string
-  }[],
-  setIndividual: (id: string) => void
+type RoleType = {
+  roleId: string,
+  name: string,
+  description: string
 }
 
-type userByIdDataType = {
-  userById: UserType
+type rolesDataType = {
+  roles: RoleType[]
 }
+
+type userDataType = {userResponse: UserType};
+
+const newData: UserType = {
+  userId: '_',
+  name: '',
+  email: '',
+  roles: [],
+}
+
+const newDataWithPass: UserStateType = {...newData, password: '', passwordRepeat: ''};
+
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
@@ -66,15 +72,48 @@ const errorInputs = {
   passwordRepeat: false
 };
 
-export default function UserEdit(props: UserEditInputType) {
-  const {individualData, allRoles, setIndividual} = props;
+const rtrnAPI = `{
+  userId: _id
+  name
+  email
+  roles {
+    roleId: _id
+  }
+}`;
+
+// export default function UserEdit(props: UserEditInputType) {
+//   const {individualData, allRoles, setIndividual} = props;
+export default function UserEdit() {
   const formClasses = useFormStyles();
-  const [ data, setData ] = useState<UserStateType>({...individualData, password: '', passwordRepeat: ''});
+  const [ data, setData ] = useState<UserStateType>(newDataWithPass);
   const [ changePass, setChangePass ] = useState(data.userId === '_');
-  const userData = useGraphQL<userByIdDataType>('post');
+  const userData = useGraphQL<userDataType>('post', {userResponse: newData});
+  const rolesData = useGraphQL<rolesDataType>('post', {roles: []});
   const [ status, setStatus ] = useState('input');
-  const [ missing, passValidate ] = usePassword();
   const [ inputError, setInputError ] = useState(errorInputs);
+  const passError = useRef({password: false, passwordRepeat: false});
+  const history = useHistory();
+  const {id} = useParams();
+  const allRoles: RoleType[] = rolesData?.result?.data?.roles || [];
+
+  useEffect(() => {
+    if (!id) history.push('/users');
+    rolesData.fetchData(`
+      query {
+        roles {
+          roleId: _id
+          name
+          description
+        }
+      }
+    `, true);
+    if (id !== '_') {
+      userData.fetchData(`
+        query{
+          userResponse: userById(id:"${id}") ${rtrnAPI}
+        }`, true, 'get');
+    }
+  }, []);
 
   useEffect(() => {
     const validation = {
@@ -85,42 +124,52 @@ export default function UserEdit(props: UserEditInputType) {
       passwordRepeat: false
     };
     if (changePass){
-      validation.password = !passValidate(data.password);
-      validation.passwordRepeat = data.password !== data.passwordRepeat;
+      validation.password = passError.current.password;
+      validation.passwordRepeat = passError.current.passwordRepeat;
     }
     setInputError(validation); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   useEffect(() => {
     if (status === 'sending') {
       const resolver = (data.userId === '_') ? 'userCreate(' : `userUpdate(id: "${data.userId}", `;
-      const hasPass = (changePass) ? `, password: "${data.password}` : '';
+      const hasPass = (changePass) ? `, password: "${data.password}"` : '';
       const cargo = `mutation {
-        ${resolver}userInput: {
+        userResponse: ${resolver}userInput: {
           name: "${data.name}",
           email: "${data.email}",
-          roles: [${data.roles.map(role => '"' + role.roleId + '"').join(', ')}]
+          roles: ["${data.roles.join('", "')}"]
           ${hasPass}
-        }){
-          userId: _id
-          name
-          email
-          roles: {
-            roleId: _id
-            name
-          }
-        }
+        })${rtrnAPI}
       }`;
-      userData.fetchData(cargo, true);
+      const flag = (data.userId === '_') ? 'create' : 'update';
+      userData.fetchData(cargo, true, flag);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   useEffect(() => {
-    if(userData.result?.data?.userById) {
-      setData({...userData.result.data.userById, password: '', passwordRepeat: ''});     
-    }
 
+    const rtrnData = userData?.result && userData.result.data && userData.result.data.userResponse;
+    if (userData?.result && rtrnData) {
+      if (['create', 'update'].includes((userData.result.flags as string))) {
+        setData({...rtrnData, password: '', passwordRepeat: ''});
+        setStatus('saved');  
+      }
+      if(userData.result.flags === 'create') {
+        history.replace(`/user/${rtrnData.userId}`);
+      }
+    } 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData.result]);
+
+  useEffect(() => {
+    if (hasErrors(userData.errors)) {
+      setStatus('error');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData.errors]);
 
   function handleText(field: string) {
     return (evt: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,36 +181,40 @@ export default function UserEdit(props: UserEditInputType) {
     setChangePass(event.target.checked);
   }
   function isRoleSelected(roleId: string): boolean {
-    return data.roles.some(role => role.roleId === roleId);
+    return data.roles.includes(roleId);
   }
 
   function handleRolesChange(event: React.ChangeEvent<{ value: unknown }>){
-    console.log('event.target.value', event.target.value);
-    if(!data || !Array.isArray(data.roles) || !Array.isArray(allRoles)) return;
-    const ids = (event.target.value as string[]);
-    const roles = allRoles.filter(role => ids.includes(role.roleId));
+    const roles = (event.target.value as string[]);
     setData({...data, roles});
   }
 
-  function saveUser(/* evt: React.FormEvent<HTMLFormElement> */) {
-    // evt.preventDefault();
+  function handlePassChange(name: 'password' | 'passwordRepeat') {
+    return (value: string, hasError: boolean) => {
+      passError.current[name] = hasError;
+      setData(prev => ({...prev, [name]: value}));
+    }
+  }
+
+  function saveUser() {
     if (Object.values(inputError).some(ierr => ierr)) return false;
     setStatus('sending');
   }
 
   function cancelEdit() {
-    setData({...individualData, password: '', passwordRepeat: ''});
-    setInputError(errorInputs);
+    if(userData.result && userData.result.data) {
+      setData({...userData.result.data.userResponse, password: '', passwordRepeat: ''});
+    }
   }
 
   if (status === 'sending') {
     return (
       <Container>  
-        <Grid container>
-          <Grid item xs={12} justify="center">
+        <Grid container justify="center">
+          <Grid item xs={12}>
             <Typography>Saving User's data</Typography>
           </Grid>
-          <Grid item xs={12} justify="center">
+          <Grid item xs={12}>
             <CircularProgress />
           </Grid>
         </Grid>
@@ -171,7 +224,32 @@ export default function UserEdit(props: UserEditInputType) {
 
   return (
     <Container>
-      <form action="">
+      <Box m={1}>
+        <Button
+          variant="text"
+          color="primary"
+          size="small"
+          startIcon={<ArrowBackIosIcon />}
+          onClick={() => history.push('/users')}
+        >
+          Return to list
+        </Button>        
+      </Box>
+      <BannerAlert
+        severity="success"
+        isOpen={status === 'saved'}
+        closeFn={() => setStatus('input')}
+        title="User saved"
+        body={'Data of user ' + data.name + ' was successfully saved on DataBase'}
+      />
+      <BannerAlert
+        severity="error"
+        isOpen={status === 'error'}
+        closeFn={() => setStatus('input')}
+        title="Error while saving User's data"
+        body={userData.errors || 'Server error'}
+      />
+      <Box m={2}>
         <Typography variant="h6" gutterBottom>
           User details
         </Typography>
@@ -208,7 +286,7 @@ export default function UserEdit(props: UserEditInputType) {
               required
               fullWidth
               label="Roles"
-              value={data.roles.map(role => role.roleId)}
+              value={data.roles}
               input={<Input />}
               renderValue={(selected) => {
                 if(selected && !Array.isArray(selected)) return '';
@@ -223,71 +301,48 @@ export default function UserEdit(props: UserEditInputType) {
                 <MenuItem key={role.roleId} value={role.roleId}>
                   <Checkbox checked={isRoleSelected(role.roleId)} />
                   <ListItemText primary={role.name} />
+                  <ListItemText secondary={role.description} />
                 </MenuItem>
               ))}
             </Select>
           </Grid>
-          <Grid item xs={12}>
-            <FormControl className={formClasses.formControl}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={changePass}
-                    onChange={handleCheckPass}
-                    inputProps={{ 'aria-label': 'primary checkbox' }}
+          {
+            data.userId !== '_' && (
+              <Grid item xs={12}>
+                <FormControl className={formClasses.formControl}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={changePass}
+                        onChange={handleCheckPass}
+                        inputProps={{ 'aria-label': 'primary checkbox' }}
+                      />
+                    }
+                    label="Edit Password"
                   />
-                }
-                label="Edit Password"
-              />
-            </FormControl>
-          </Grid>
+                </FormControl>
+              </Grid>
+            )
+          }
           {
             changePass && (
               <>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    required
-                    name="password"
-                    type="password"
-                    label="Password"
-                    fullWidth
-                    value={data.password}
-                    onChange={handleText('password')}
-                    error={inputError.password}
-                    helperText={inputError.password && 'Password does not fulfill rules'}
+                  <PasswordInput
+                    fieldId={'pass_' + data.userId}
+                    onChange={handlePassChange('password')}
+                    className={formClasses.formControl}
+                    validation="rules"
                   />
-                  {
-                    inputError.password && (
-                      <>
-                        <Typography variant="h6">
-                          Password needs to fulfill the following rules
-                        </Typography>
-                        <div>
-                          <List dense={true}>
-                            {missing.map((rule) => (
-                              <ListItem>
-                                <ListItemText
-                                  primary={rule}
-                                />
-                              </ListItem>
-                            ))}
-                          </List>
-                        </div>
-                      </>
-                    )
-                  }
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    required
-                    name="passwordRepeat"
-                    type="password"
+                  <PasswordInput
+                    fieldId={'pass-rep_' + data.userId}
+                    onChange={handlePassChange('passwordRepeat')}
+                    className={formClasses.formControl}
+                    validation="repeat"
+                    original={data.password}
                     label="Repeat Password"
-                    fullWidth
-                    value={data.password}
-                    onChange={handleText('passwordRepeat')}
-                    error={inputError.passwordRepeat}
-                    helperText={inputError.passwordRepeat && 'Both passwords must be equals'}
                   />
                 </Grid>
               </>
@@ -306,7 +361,7 @@ export default function UserEdit(props: UserEditInputType) {
             </FormControl>
           </Box>
         </Grid>
-      </form>
+      </Box>
     </Container>
   );
 }
