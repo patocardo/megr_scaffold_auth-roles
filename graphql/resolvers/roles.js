@@ -3,11 +3,17 @@ const ErrorMessages = require('../../helpers/error-messages');
 
 const roleResolvers = {
   roles: async function (args, req) {
-    if(!this.isAuthorized('roleCreate', req)) throw new Error(ErrorMessages.notAuthorized.response);
-    return Role.find();
+    try {
+      if(!this.isAuthorized('roles', req)) throw new Error(ErrorMessages.notAuthorized.response);
+      return (!!args.search)
+          ? Role.fuzzySearch(args.search)
+          : Role.find();;
+    } catch(err) {
+      throw err;
+    }
   },
   roleById: async function (args, req) {
-    if(!this.isAuthorized('roleCreate', req)) throw new Error(ErrorMessages.notAuthorized.response);
+    if(!this.isAuthorized('roleById', req)) throw new Error(ErrorMessages.notAuthorized.response);
     return Role.findById(args.id);
   },
   roleCreate: async function (args, req) {
@@ -41,9 +47,9 @@ const roleResolvers = {
   rolesRemove: async (args, req) => {
     try {
       if(!this.isAuthorized('rolesRemove', req, 'sudo')) throw new Error(ErrorMessages.notAuthorized.response);
-      if(!req.userData.roles.some((role) => role.name === 'sudo')) throw new Error(ErrorMessages.notAuthorized.response);
-      const removedRoles = await Role.remove({_id: {$in: args.ids }});
-      return removedRole.deletedCount;
+      const removedRoles = await Role.deleteMany({'_id': { $in: args.ids }});
+      if (removedRoles.ok !== 1) throw new Error(ErrorMessages.failed('remove roles').response);
+      return removedRoles.deletedCount; 
     } catch (e) {
       throw err;
     }

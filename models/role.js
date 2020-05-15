@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const autopopulate = require('mongoose-autopopulate');
+const mongoose_fuzzy_searching = require('mongoose-fuzzy-searching');
 
 const roleSchema = new mongoose.Schema({
   name: {
@@ -16,5 +17,6 @@ const roleSchema = new mongoose.Schema({
   }
 });
 roleSchema.plugin(autopopulate);
+roleSchema.plugin(mongoose_fuzzy_searching, {fields: ['name', 'description']});
 
 module.exports = mongoose.model('Role', roleSchema);

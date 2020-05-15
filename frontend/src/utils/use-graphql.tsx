@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { parseGraphQLError, IError } from '../globals/error-handling';
-import { IloginInfo } from '../globals/reducer';
+import { useState, useEffect, useContext, SetStateAction, Dispatch } from 'react';
+import { parseGraphQLError, ErrorType, mapJSError} from '../globals/error-handling';
 import { StateContext } from '../globals/context';
 
-type optionsType = {
+type ParamsType = {
   method: string,
   body: string,
   headers: {
@@ -11,66 +10,61 @@ type optionsType = {
   }
 }
 
-type GraphQLType<T> = {
-  data: null | T,
-  errors: IError[] | null,
-  fetchData: (expression: string, isAuth?: boolean) => void
+export type BaseResponseType = {
+  errors?: Array<any>,
+}
+
+export type ResultType<T> = {
+  data: T | null,
+  flag: string
+}
+export type FetchPropsType = {
+  expression: string,
+  isAuth?: boolean,
+  flag?: string,
+}
+export type GraphQLResultType<T> = {
+  data: T | null,
+  flag: string
+  errors: ErrorType[] | null,
+  fetchData: Dispatch<SetStateAction<FetchPropsType>>
 }
 
 const origin = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : window.location.origin;
-
-const baseOptions: optionsType = {
+  
+const baseParams: ParamsType = {
   method: 'POST',
   body: '',
   headers: {
     'Content-type': 'application/json',
     Accept: 'application/json',
   },
-};
-
-export type BaseResponseType = {
-  errors?: Array<any>,
-  extensions?: {
-    newToken: string
-  }
+}
+function getResolver(expression: string): string {
+  const fit = expression.match(/(?:mutation|query|subscription)\s*{\s*(\w+)/mi);
+  if(!fit) throw new Error('no resolver');
+  return fit[1];
 }
 
-type ResultType<T> = null |{
-  data: T | null,
-  token?: string
-}
-
-type GraphQLResultType<T> = {
-  result: ResultType<T>,
-  errors: IError[] | null,
-  fetchData: (expression: string, isAuth?: boolean) => void
-}
-
-export default function useGraphQL<T>(method: 'post' | 'get' | 'put' = 'post'): GraphQLResultType<T> {
-  const [ result, setResult ] = useState<ResultType<T>>(null);
-  const [ errors, setErrors ] = useState<IError[] | null>(null);
-  const { state } = useContext(StateContext);
-  const [ options, setOptions ] = useState(baseOptions);
-
-
-  function fetchData(expression: string, isAuth?: boolean) {
-    const params = {
-      ...baseOptions,
-      body: JSON.stringify({ query: expression }),
-      method: method.toUpperCase()
-    };
-    if (isAuth && state.loginInfo?.token) {
-      params.headers.Authorization = `Bearer ${state.loginInfo.token}`;
-    }
-    setOptions(params);
-  }
+export default function useGraphQL<T>(initial: T | null = null): GraphQLResultType<T> {
+  const [ result, setResult ] = useState<ResultType<T>>({ data: initial, flag:''});
+  const [ errors, setErrors ] = useState<ErrorType[] | null>(null);
+  const { contextState } = useContext(StateContext);
+  const [ args, fetchData] = useState<FetchPropsType>({expression: '', isAuth: false});
 
   useEffect(() => {
     (async () => {
-      if (!options.body.length) return false;
-      const response = await fetch(`${origin}/graphql`, options);
+      if(args.expression.length < 6) return;
+      const params: ParamsType = {
+        ...baseParams,
+        body: JSON.stringify({ query: args.expression }),
+      };
+      if (args.isAuth && contextState.token) {
+        params.headers.Authorization = `Bearer ${contextState.token}`;
+      }
+      const response = await fetch(`${origin}/graphql`, params);
       const json = await response.json();
 
       const comesWithErrors = parseGraphQLError(json);
@@ -79,69 +73,45 @@ export default function useGraphQL<T>(method: 'post' | 'get' | 'put' = 'post'): 
         setErrors(comesWithErrors);
         return false;
       }
-
-      if (state.loginInfo?.token) {
-        const token = json.extensions.newToken;
-        setResult({ data: json.data, token });
-      } else {
-        setResult({ data: json.data });
-      }
+      const resObj: ResultType<T> = {data: json.data[getResolver(args.expression)], flag: args.flag || ''};
+      setResult(resObj);
     })();
+  }, [args.expression, args.isAuth, args.flag, contextState.token]);
 
-  }, [options]);
-
-  return { result, errors, fetchData };
+  return { ...result, errors, fetchData };
 }
 
-type GraphQLFnType = (expression: string, loginInfo?: IloginInfo | null) => void;
-
-type GraphQLInputType2<T> = {
-  // setData: (newData: T) => void,
-  setErrors: (newErrors: IError[]) => void,
-  method?: 'post' | 'get' | 'put'
+type FetchGraphQLPropsType = {
+  expression: string,
+  token?: string,
 }
 
-type GraphQL2ReturnType<T> = {
-  data: T | null,
-  fetchData: GraphQLFnType
-}
-
-// hook to run outside Context, it doesn't update token
-export function useGraphQL2<T>(args: GraphQLInputType2<T>): GraphQL2ReturnType<T> {
-  // const { setData, setErrors, method = 'post'} = args;
-  const { setErrors, method = 'post'} = args;
-  const [ data, setData ] = useState<T | null>(null)
-  const [ options, setOptions ] = useState(baseOptions);
-
-  function fetchData(expression: string, loginInfo?: IloginInfo | null) {
-    const params = {
-      ...baseOptions,
-      body: JSON.stringify({ query: expression }),
-      method: method.toUpperCase()
-    };
-    if (loginInfo?.token) {
-      params.headers.Authorization = `Bearer ${loginInfo.token}`;
-    }
-    setOptions(params);
+export async function fetchGraphQl<T>(props: FetchGraphQLPropsType): Promise<T | null> {
+  const { token, expression } = props;
+  const resolver = getResolver(expression);
+  const params: ParamsType = {
+    ...baseParams,
+    body: JSON.stringify({ query: expression }),
+  };
+  if (token && (token as string).length > 4) {
+    params.headers.Authorization = `Bearer ${token}`;
   }
-
-  useEffect(() => {
-    (async () => {
-      if (!options.body.length) return false;
-      const response = await fetch(`${origin}/graphql`, options);
-      const json = await response.json();
-
-      const comesWithErrors = parseGraphQLError(json);
-
-      if (comesWithErrors) {
-        setErrors(comesWithErrors);
-        return false;
-      }
-
-      setData(json.data);
-    })();
-
-  }, [options]);
-
-  return { data, fetchData};
+  let json = null;
+  try {
+    const response = await fetch(`${origin}/graphql`, params);
+    json = await response.json();
+    if(!json) return null;
+  } catch (e) {
+    throw new Error(JSON.stringify([mapJSError(e)]))
+  } 
+  const comesWithErrors = parseGraphQLError(json);
+  if(comesWithErrors) throw new Error(JSON.stringify(comesWithErrors));
+  if(!json?.data || typeof json?.data[resolver] === 'undefined') {
+    const respErr = JSON.stringify({
+      key: 'bad response',
+      message: `property data and ${resolver} not found`
+    });
+    throw new Error(respErr);
+  }
+  return json.data[resolver];
 }

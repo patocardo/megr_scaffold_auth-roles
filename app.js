@@ -33,15 +33,8 @@ app.get('/', (req, res, next) => {
 
 app.use(isAuth);
 
-const extensions = ({ context }) => {
-  return {
-    newToken: context.newToken,
-  };
-};
-
 app.use('/graphql', graphqlHttp({
   schema: schema,
   rootValue: resolvers,
-  graphiql: true,
-  extensions: extensions
+  graphiql: process.env.INSTANCE !== 'production'
 }));

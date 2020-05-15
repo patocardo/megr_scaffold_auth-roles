@@ -11,19 +11,17 @@
 
 ## TODOS
 - Sistem
-  - Update menu
   - Redirection login to private home page
-  - Landing page
   - Multi-platform Icons
   - Manifiest
   - Performance optimization
+- Security
+  - Canceling jw-token
+  - Registering
+  - Password forgot
 - CRUD
-  - individual save, create, delete
-  - individual route
-  - multiple delete
   - pagination
 - Error handing:
-  - UI of displayable error
   - API normalization
   - log service
 - Documents:

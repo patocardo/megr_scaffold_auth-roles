@@ -25,15 +25,16 @@ const schema = graphql.buildSchema(`
   type AuthData {
     userId: ID!
     token: String!
-    expiration: Int!
+    expiration: Float!
   }
 
   type AuthBackData {
     email: String!
-  }
-
-  type SuccessData {
-    success: String!
+    remember: Boolean!
+    exp: Int!
+    iat: Int!
+    userId: ID!
+    expiration: Float!
   }
 
   input UserInput {
@@ -44,17 +45,20 @@ const schema = graphql.buildSchema(`
   }
 
   type RootQuery {
-    roles: [Role!]!
+    roles(search: String): [Role!]!
+    roleById(id: String): Role!
     resolvers: [String!]!
     users(search: String, role: String): [User!]
+    userById(id: String): User
     login(email: String!, password: String!, remember: Boolean): AuthData
     tokenIsAlive(token: String!): AuthBackData
+    refreshToken(token: String!): AuthData
   }
 
   type RootMutation {
     roleCreate(roleInput: RoleInput): Role
     roleUpdate(id: String!, roleInput: RoleInput): Role
-    rolesRemove(ids: [String!]!): Boolean
+    rolesRemove(ids: [String!]!): Int
     userCreate(userInput: UserInput): User
     userUpdate(id: String!, userInput: UserInput): User
     usersRemove(ids: [String!]): Int

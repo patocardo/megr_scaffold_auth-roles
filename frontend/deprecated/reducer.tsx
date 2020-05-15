@@ -12,7 +12,8 @@ export const initialContextState: IcontextState = {
 }
 
 // Reducer
-export type ActionType = {
+
+export type ActionType = { 
   type: string,
   payload?: IcontextState
 }
@@ -20,13 +21,14 @@ export type ActionType = {
 export type DispatchType = (action: ActionType) => any;
 
 const objReducer: any = {
-  'SIGNEDOUT': (state: IcontextState, payload?: null) => ({...state, loginInfo: null}),
+  'SIGNEDOUT': (state: IcontextState) => ({...state, loginInfo: null}),
   'SIGNEDIN': (state: IcontextState, payload: {loginInfo: IloginInfo}) => ({...state, ...payload})
 }
 
 function reducer(state = initialContextState, action: ActionType): IcontextState {
   if (!action || !({}).hasOwnProperty.call(objReducer, action.type)) return state;
-  return objReducer[action.type](state, action.payload);
+  const payload = (({}).hasOwnProperty.call(action, 'payload')) ?  action.payload : null;
+  return objReducer[action.type](state, payload);
 }
 
 export default reducer;

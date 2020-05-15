@@ -38,5 +38,14 @@ module.exports = {
       }),
       log: 'attempt to modified nonexistent ' + model
     }
+  },
+  failed: (operation) => {
+    return {
+      response: JSON.stringify({
+        name: 'filed',
+        public: 'Server fail while trying to ' + operation
+      }),
+      log: 'attempt to ' + operation + ' failed'
+    }
   }
 };

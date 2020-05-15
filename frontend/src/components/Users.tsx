@@ -1,28 +1,51 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useHistory } from 'react-router-dom';
 import {
+  Box,
   Container,
   TextField,
   FormControl,
-  Box,
-  Typography,
   InputLabel,
+  InputAdornment,
   Select,
   MenuItem,
-  // CircularProgress
 } from '@material-ui/core';
-import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
-import useCummulativeDelay from '../utils/use-delay';
-import useWithEmpty from '../utils/use-with-empty';
+import SearchIcon from '@material-ui/icons/Search';
+import { isEqual } from 'lodash';
+import { useDebounce } from 'use-debounce';
+import DataWrapper from './DataWrapper';
 import useGraphQL from '../utils/use-graphql';
 import EnhancedTable from './EnhancedTable';
-import { IError } from '../globals/error-handling';
-import { StateContext } from '../globals/context';
-import UserEdit from './UserEdit';
+import { BannerError } from '../globals/error-handling';
+import usePrevious from '../utils/use-previous';
+import useMultipleDelete from '../utils/use-multiple-delete';
 import useFormStyles from '../utils/use-form-styles';
 
 type FilterType = {
   search: string,
   roleId: string
+}
+
+type UserDataType = {
+  userId: string,
+  name: string,
+  email: string,
+  roles: {
+    roleId: string
+    name: string
+  }[]
+}
+
+type UserDisplayType = {
+  userId: string,
+  name: string,
+  email: string,
+  roles: string
+}
+
+type RoleType = {
+  roleId: string,
+  name: string
 }
 
 const initialFilter: FilterType = {
@@ -46,143 +69,102 @@ function makeListExpression(filter: FilterType): string {
   `;
 }
 
-function makeDeleteExpression(ids: number[]): string {
-  return `
-    mutation {
-      removeUsers(ids: ${ids}) {
-        name
-      }
-    }
-  `;
-}
+const headCells = [
+  {
+    disablePadding: false,
+    id: 'name',
+    label: 'Name',
+    numeric: false
+  },
+  {
+    disablePadding: false,
+    id: 'email',
+    label: 'E-mail',
+    numeric: false
+  },
+  {
+    disablePadding: false,
+    id: 'roles',
+    label: 'Roles',
+    numeric: false
+  }
+];
 
-type userDataType = {
-  userId: string,
-  name: string,
-  email: string,
-  roles: {
-    roleId: string
-    name: string
-  }[]
-}
-
-type usersDataType = {
-  users: userDataType[]
-}
-
-type userType = {
-  userId: string,
-  name: string,
-  email: string,
-  roles: string
-}
-
-type roleType = {
-  roleId: string,
-  name: string
-}
-
-type rolesDataType = {
-  roles: roleType[]
-}
 
 export default function Users() {
-  const [usersDisplay, setUsersDisplay] = useState<userType[]>([]);
-  const [individual, setIndividual] = useState('');
-  const [errors, setErrors] = useState<IError[] | null>(null);
+  const [usersDisplay, setUsersDisplay] = useState<UserDisplayType[]>([]);
   const [filter, setFilter] = useState(initialFilter);
-  const setDelayFilter = useCummulativeDelay(3000);
-  const usersData = useGraphQL<usersDataType>('post');
-  const rolesData = useGraphQL<rolesDataType>('post');
-  const { WithEmpty } = useWithEmpty<userType>();
-  const { state, dispatch } = useContext(StateContext);
+  const [debouncedFilter] = useDebounce(filter, 1000);
+  const { data, errors, fetchData} = useGraphQL<UserDataType[] | null>(null);
+  const prevUserData = usePrevious(data);
+  const { data: rolesData, errors: rolesError, fetchData: fetchRoles } = useGraphQL<RoleType[]>([]);
   const classes = useFormStyles();
+  const [searchText, setSearchText] = useState('');
+  const history = useHistory();
+  const mounted = useRef(false);
+  const {MultiDelCompo, handleDelete} = useMultipleDelete({
+    resolver: 'usersRemove',
+    collection: data || [],
+    getId: (user: UserDataType) => user.userId,
+    getItemText: (user: UserDataType) => `${user.name}<${user.email}>`,
+    modelNames: 'users'
+  });
 
-  const headCells = [
-    {
-      disablePadding: false,
-      id: 'name',
-      label: 'Name',
-      numeric: false
-    },
-    {
-      disablePadding: false,
-      id: 'email',
-      label: 'E-mail',
-      numeric: false
-    },
-    {
-      disablePadding: false,
-      id: 'roles',
-      label: 'Roles',
-      numeric: false
-    }
-  ];
   useEffect(() => {
-    console.log('por mount');
-    rolesData.fetchData(`
-      query {
+    if(!mounted.current) {
+      fetchRoles( { expression: `query {
         roles {
           roleId: _id
           name
         }
-      }
-    `, true);
-    usersData.fetchData(makeListExpression(filter), true);
-  }, []);
+      }`, isAuth: true});
+      fetchData({ expression: makeListExpression(initialFilter), isAuth: true});  
+      mounted.current = true;
+    }
+  }, [fetchRoles, fetchData]);
 
   useEffect(() => {
-    console.log('por filter')
-    usersData.fetchData(makeListExpression(filter), true);
-  }, [filter]);
+    fetchData({ expression: makeListExpression(debouncedFilter), isAuth: true});
+  }, [debouncedFilter, fetchData]);
 
   useEffect(() => {
-    if (usersData.result) {
-      const { data, token } = usersData.result;
-      if ( data && data?.users?.length > 0) {
-        const newUsers: userType[] = data.users.map(user => ({
+    if (!isEqual(data, prevUserData)) {
+      const newUsers: UserDisplayType[] = (data === null)
+        ? []
+        : data.map((user: UserDataType) => ({
           ...user,
-          roles: user.roles.map(role => role.name).join(', ')
+          roles: user.roles.map((role) => role.name).join(', ')
         }));
-        setUsersDisplay(newUsers)
-      }
-      if( token && state.loginInfo?.email) {
-        dispatch({ type: 'SIGNEDIN', payload: { loginInfo: { email: state.loginInfo.email, token} }});
-      }
+
+      setUsersDisplay(newUsers);
     }
 
-  }, [usersData.result]);
+  }, [data, prevUserData]);
 
-  function handleSearch(evt: React.ChangeEvent<HTMLInputElement>) {
-    setDelayFilter(() => setFilter({...filter, search: evt.target.value}));
+  function handleSearch(evt: React.ChangeEvent<{ value: string }>) {
+    setSearchText(evt.target.value);
+    setFilter({...filter, search: evt.target.value})
   }
 
   function handleRole(evt: React.ChangeEvent<{ value: unknown }>) {
-    setDelayFilter(() => setFilter({...filter, roleId: evt.target.value as string}));
+    setFilter({...filter, roleId: evt.target.value as string});
   }
 
   function handleEdit(id: string) {
-    setIndividual(id);
+    history.push('/user/' + id);
   }
 
-  const roles = rolesData?.result?.data?.roles || [];
-
-  if (individual) {
-    if (roles && roles.length) {
-      const singleData = usersData?.result?.data?.users.find(user => user.userId === individual) || {
-        userId: '_',
-        name: '',
-        email: '',
-        roles: []
-      };
-      return <UserEdit allRoles={roles} individualData={singleData} setIndividual={setIndividual} />
-    } else {
-      // TODO: waiting message
-    }
+  function handleAdd() {
+    history.push('/user/_');
   }
 
   return (
     <Container>
+     <MultiDelCompo />
+      <BannerError
+        message={`Error while fetching records of Users`}
+        errors={[errors, rolesError]}
+      /> 
       <Box>
         <FormControl variant="outlined" className={classes.formControl}>
           <TextField
@@ -190,15 +172,23 @@ export default function Users() {
             margin="normal"
             id="search"
             label="Search by name and email"
-            name="search"
             autoComplete="search"
+            name="search"
             autoFocus
             onChange={handleSearch}
-            value={filter.search}
+            value={searchText}
+            InputProps={{
+              endAdornment:(
+                <InputAdornment position="end">
+                  <SearchIcon />
+                </InputAdornment>
+              )
+            }}
+            
           />
         </FormControl>
         {
-          roles.length > 0 && (
+          Array.isArray(rolesData) && rolesData.length > 0 && (
             <FormControl variant="outlined" className={classes.formControl}>
               <InputLabel id="filter-role-label" className={classes.marginedTop}>Role</InputLabel>
               <Select
@@ -210,28 +200,30 @@ export default function Users() {
                 className={classes.marginedTop}
               >
                 <MenuItem value="">
-                  <em>None</em>
+                  <em>All</em>
                 </MenuItem>
                 {
-                  roles.map(role => (<MenuItem value={role.roleId} key={role.roleId}>{role.name}</MenuItem>))
+                  Array.isArray(rolesData) && rolesData.map((role: RoleType) => {
+                    return(<MenuItem value={role.roleId} key={role.roleId}>{role.name}</MenuItem>);
+                  })
                 }
               </Select>
             </FormControl>
           )
         }
       </Box>
-      <WithEmpty data={usersDisplay}>
-        {(rows: userType[]) => (
-          <EnhancedTable
-            headCells={headCells}
-            rows={rows}
-            title="Users"
-            idName="userId"
-            editFn={handleEdit}
-          />
-        )}
-      </WithEmpty>
+      <DataWrapper<UserDataType> items={data}>
+        <EnhancedTable
+          headCells={headCells}
+          rows={usersDisplay}
+          title="Users"
+          idName="userId"
+          editFn={handleEdit}
+          deleteFn={handleDelete}
+          addFn={handleAdd}
+        />
+      </DataWrapper>
+
     </Container>
   );
 }
-
