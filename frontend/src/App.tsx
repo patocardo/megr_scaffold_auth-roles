@@ -5,28 +5,59 @@ import {
   // Redirect,
   Switch,
 } from 'react-router-dom';
-
-import reducer, { initialContextState } from './globals/reducer';
-import { StateContext } from './globals/context';
-import { useCheckIsAlive } from './utils/use-auth';
-import { PrivateRoute } from './components/PrivateRoute';
+import {
+  Grid,
+  Typography,
+  LinearProgress,
+} from '@material-ui/core';
+import { StateContext,  contextReducer, ContextStateOut } from './globals/context';
+import { checkIsAlive } from './utils/use-auth';
 
 import NavBar from './components/Navbar';
-import withErrorBoundary, { ErrorType, logError } from './globals/error-handling';
+import withErrorBoundary, { ErrorType, logError, mapBackErrors } from './globals/error-handling';
+const RenewToken = lazy(() => import('./components/RenewToken'));
+const Home = lazy(() => import('./components/Home'));
+const NoRoute = lazy(() => import('./components/NoRoute'));
 const Login = lazy(() => import('./components/Login'));
 const Users = lazy(() => import('./components/Users'));
 const UserEdit = lazy(() => import('./components/UserEdit'));
+const Roles = lazy(() => import('./components/Roles'));
+const RoleEdit = lazy(() => import('./components/RoleEdit'));
+
+const Fallback = () => (
+  <>
+  <Grid container justify="center" spacing={2}>
+    <Grid item xs={8}>
+      <LinearProgress />
+    </Grid>
+    <Grid item xs={8}>
+      <Typography align="center" variant="h6">Loading App</Typography>
+    </Grid>
+  </Grid>
+</>
+)
+
+const contextStateInitial = {...ContextStateOut, token: '_'};
 
 function App() {
-  const [ state, dispatch] = useReducer(reducer, initialContextState);
+  const [ contextState, contextDispatch] = useReducer(contextReducer, contextStateInitial);
   const [ errors, setErrors ] = useState<ErrorType[] | null>(null);
-
-  const checkIsAlive = useCheckIsAlive({ loginInfo: state.loginInfo, dispatch, setErrors });
-
+ 
   useEffect(() => {
-    checkIsAlive();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    (async() => {
+      if (contextState.token !== '_') return;
+      try {
+        const payload = await checkIsAlive(contextState.token.length > 3 ? contextState.token : '');
+        if(payload.token.length < 3) {
+          contextDispatch({type: 'SIGNEDOUT'});
+        } else {
+          contextDispatch({type: 'SIGNEDIN', payload});
+        }
+      } catch (err) {
+        setErrors(mapBackErrors(err)) ;
+      }        
+    })();
+  }, [contextState.token, contextDispatch]);
 
   useEffect(() => {
     if(errors) {
@@ -35,16 +66,33 @@ function App() {
     }
   }, [errors]);
 
+  const isLogged = contextState.token.length > 3;
+
   return (
-    <StateContext.Provider value={{state, dispatch}}>
+    <StateContext.Provider value={{contextState, contextDispatch}}>
       <BrowserRouter>
         <>
           <NavBar />
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<Fallback />}>
+            {
+              isLogged && (<RenewToken />)
+            }
             <Switch>
-              <PrivateRoute exact path='/users'><Users /></PrivateRoute>
-              <PrivateRoute path='/user/:id'><UserEdit /></PrivateRoute>
+              {
+                isLogged && ([
+                  <Route exact path='/users' key="users"><Users /></Route>,
+                  <Route path='/user/:id' key="useredit"><UserEdit /></Route>,
+                  <Route exact path='/roles' key="roles"><Roles /></Route>,
+                  <Route path='/role/:id' key="roleedit"><RoleEdit /></Route>
+                ])
+              }
               <Route path='/login' component={Login} />
+              <Route exact path='/'><Home /></Route>
+              {
+                contextState.token !== '_' && (
+                  <Route path="*"><NoRoute /></Route>
+                )
+              }
             </Switch>
           </Suspense>
         </>

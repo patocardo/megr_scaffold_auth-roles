@@ -18,11 +18,13 @@ import {
 } from '@material-ui/core';
 import ArrowBackIosIcon from '@material-ui/icons/ArrowBackIos';
 import { validate } from 'email-validator';
+import useEffectDeep from '../utils/use-effect-deep';
 import useGraphQL from '../utils/use-graphql';
-import { ErrorType, hasErrors } from '../globals/error-handling';
+import { BannerError } from '../globals/error-handling';
 import useFormStyles from '../utils/use-form-styles';
 import BannerAlert from './BannerAlert';
 import PasswordInput from './PasswordInput';
+import {Omit} from '../utils/types';
 
 type UserType = {
   userId: string,
@@ -30,6 +32,13 @@ type UserType = {
   email: string,
   roles: string[]  
 }
+
+type UserDataType = Omit<UserType, 'roles'> & {
+  roles: {
+    roleId: string
+  }[]
+}
+
 type UserStateType = UserType & {password: string, passwordRepeat: string };
 
 type RoleType = {
@@ -38,20 +47,14 @@ type RoleType = {
   description: string
 }
 
-type rolesDataType = {
-  roles: RoleType[]
-}
-
-type userDataType = {userResponse: UserType};
-
-const newData: UserType = {
+const newData: UserDataType = {
   userId: '_',
   name: '',
   email: '',
   roles: [],
 }
 
-const newDataWithPass: UserStateType = {...newData, password: '', passwordRepeat: ''};
+const newStateWithPass: UserStateType = {...newData, roles: [], password: '', passwordRepeat: ''};
 
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
@@ -81,45 +84,45 @@ const rtrnAPI = `{
   }
 }`;
 
-// export default function UserEdit(props: UserEditInputType) {
-//   const {individualData, allRoles, setIndividual} = props;
 export default function UserEdit() {
   const formClasses = useFormStyles();
-  const [ data, setData ] = useState<UserStateType>(newDataWithPass);
-  const [ changePass, setChangePass ] = useState(data.userId === '_');
-  const userData = useGraphQL<userDataType>('post', {userResponse: newData});
-  const rolesData = useGraphQL<rolesDataType>('post', {roles: []});
+  const [ info, setInfo ] = useState<UserStateType>(newStateWithPass);
+  const [ changePass, setChangePass ] = useState(info.userId === '_');
+  const { data, errors, flag, fetchData} = useGraphQL<UserDataType>(newData);
+  const { data: rolesData, errors: rolesErrors, fetchData: fetchRolesData }= useGraphQL<RoleType[]>([]);
   const [ status, setStatus ] = useState('input');
   const [ inputError, setInputError ] = useState(errorInputs);
   const passError = useRef({password: false, passwordRepeat: false});
   const history = useHistory();
   const {id} = useParams();
-  const allRoles: RoleType[] = rolesData?.result?.data?.roles || [];
+  const mounted = useRef(false);
 
   useEffect(() => {
     if (!id) history.push('/users');
-    rolesData.fetchData(`
-      query {
+    if(!mounted.current) {
+      fetchRolesData({ expression: `query {
         roles {
           roleId: _id
           name
           description
         }
-      }
-    `, true);
-    if (id !== '_') {
-      userData.fetchData(`
-        query{
+      }`, isAuth: true});
+      if (id !== '_') {
+        fetchData({ expression: `query{
           userResponse: userById(id:"${id}") ${rtrnAPI}
-        }`, true, 'get');
+        }`, isAuth: true, flag: 'get'});
+      }
+      mounted.current = true;
     }
-  }, []);
 
-  useEffect(() => {
+  }, [fetchRolesData, history, fetchData, id]);
+
+  useEffectDeep(() => {
+    const {name, email, roles} = info;
     const validation = {
-      name: data.name.length < 4,
-      email: !validate(data.email),
-      roles: data.roles.length === 0,
+      name: name.length < 4,
+      email: !validate(email),
+      roles: roles.length === 0,
       password: false,
       passwordRepeat: false
     };
@@ -128,52 +131,48 @@ export default function UserEdit() {
       validation.passwordRepeat = passError.current.passwordRepeat;
     }
     setInputError(validation); 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
 
-  useEffect(() => {
+  }, [info, changePass]);
+
+  useEffectDeep(() => {
     if (status === 'sending') {
-      const resolver = (data.userId === '_') ? 'userCreate(' : `userUpdate(id: "${data.userId}", `;
-      const hasPass = (changePass) ? `, password: "${data.password}"` : '';
-      const cargo = `mutation {
+      const {userId, password, name, email, roles} = info;
+      const resolver = (userId === '_') ? 'userCreate(' : `userUpdate(id: "${userId}", `;
+      const hasPass = (changePass) ? `, password: "${password}"` : '';
+      const expression = `mutation {
         userResponse: ${resolver}userInput: {
-          name: "${data.name}",
-          email: "${data.email}",
-          roles: ["${data.roles.join('", "')}"]
+          name: "${name}",
+          email: "${email}",
+          roles: ["${roles.join('", "')}"]
           ${hasPass}
         })${rtrnAPI}
       }`;
-      const flag = (data.userId === '_') ? 'create' : 'update';
-      userData.fetchData(cargo, true, flag);
+      const flag = (info.userId === '_') ? 'create' : 'update';
+      fetchData({expression, isAuth: true, flag});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status]);
 
-  useEffect(() => {
+  }, [status, info, changePass, fetchData]);
 
-    const rtrnData = userData?.result && userData.result.data && userData.result.data.userResponse;
-    if (userData?.result && rtrnData) {
-      if (['create', 'update'].includes((userData.result.flags as string))) {
-        setData({...rtrnData, password: '', passwordRepeat: ''});
+  useEffectDeep(() => {
+    if (!!data) {
+      if (['create', 'update'].includes(flag)) {
+        setInfo({
+          ...data,
+          roles: data.roles.map(role => role.roleId),
+          password: '',
+          passwordRepeat: ''
+        });
         setStatus('saved');  
       }
-      if(userData.result.flags === 'create') {
-        history.replace(`/user/${rtrnData.userId}`);
+      if(flag === 'create') {
+        history.replace(`/user/${data.userId}`);
       }
     } 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData.result]);
-
-  useEffect(() => {
-    if (hasErrors(userData.errors)) {
-      setStatus('error');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData.errors]);
+  }, [data, flag, history]);
 
   function handleText(field: string) {
     return (evt: React.ChangeEvent<HTMLInputElement>) => {
-      setData({...data, [field]: evt.target.value})
+      setInfo({...info, [field]: evt.target.value})
     }
   }
 
@@ -181,18 +180,18 @@ export default function UserEdit() {
     setChangePass(event.target.checked);
   }
   function isRoleSelected(roleId: string): boolean {
-    return data.roles.includes(roleId);
+    return info.roles.includes(roleId);
   }
 
   function handleRolesChange(event: React.ChangeEvent<{ value: unknown }>){
     const roles = (event.target.value as string[]);
-    setData({...data, roles});
+    setInfo({...info, roles});
   }
 
   function handlePassChange(name: 'password' | 'passwordRepeat') {
     return (value: string, hasError: boolean) => {
       passError.current[name] = hasError;
-      setData(prev => ({...prev, [name]: value}));
+      setInfo(prev => ({...prev, [name]: value}));
     }
   }
 
@@ -202,8 +201,13 @@ export default function UserEdit() {
   }
 
   function cancelEdit() {
-    if(userData.result && userData.result.data) {
-      setData({...userData.result.data.userResponse, password: '', passwordRepeat: ''});
+    if(!!data) {
+      setInfo({
+        ...data,
+        roles: data.roles.map(role => role.roleId),
+        password: '', 
+        passwordRepeat: ''
+      });
     }
   }
 
@@ -240,14 +244,11 @@ export default function UserEdit() {
         isOpen={status === 'saved'}
         closeFn={() => setStatus('input')}
         title="User saved"
-        body={'Data of user ' + data.name + ' was successfully saved on DataBase'}
+        body={'Data of user ' + info.name + ' was successfully saved on DataBase'}
       />
-      <BannerAlert
-        severity="error"
-        isOpen={status === 'error'}
-        closeFn={() => setStatus('input')}
-        title="Error while saving User's data"
-        body={userData.errors || 'Server error'}
+      <BannerError
+        message="Error while saving User's data or retrieving from server"
+        errors={[errors, rolesErrors]}
       />
       <Box m={2}>
         <Typography variant="h6" gutterBottom>
@@ -259,7 +260,7 @@ export default function UserEdit() {
               required
               name="name"
               label="Name"
-              value={data.name}
+              value={info.name}
               fullWidth
               autoComplete="name"
               onChange={handleText('name')}
@@ -274,7 +275,7 @@ export default function UserEdit() {
               label="Email"
               fullWidth
               autoComplete="email"
-              value={data.email}
+              value={info.email}
               onChange={handleText('email')}
               error={inputError.email}
               helperText={inputError.email && 'Invalid email address'}
@@ -286,18 +287,18 @@ export default function UserEdit() {
               required
               fullWidth
               label="Roles"
-              value={data.roles}
+              value={info.roles}
               input={<Input />}
               renderValue={(selected) => {
-                if(selected && !Array.isArray(selected)) return '';
-                return allRoles
-                  .filter(role => (selected as string[]).includes(role.roleId))
-                  .map(role => role.name).join(', ')
+                if(!selected || !Array.isArray(selected) || !Array.isArray(rolesData)) return '';
+                return (rolesData as RoleType[])
+                  .filter((role) => (selected as string[]).includes(role.roleId))
+                  .map((role) => role.name).join(', ')
               }}
               onChange={handleRolesChange}
               MenuProps={MenuProps}
             >
-              {allRoles.map((role) => (
+              {Array.isArray(rolesData) && rolesData.map((role) => (
                 <MenuItem key={role.roleId} value={role.roleId}>
                   <Checkbox checked={isRoleSelected(role.roleId)} />
                   <ListItemText primary={role.name} />
@@ -307,7 +308,7 @@ export default function UserEdit() {
             </Select>
           </Grid>
           {
-            data.userId !== '_' && (
+            info.userId !== '_' && (
               <Grid item xs={12}>
                 <FormControl className={formClasses.formControl}>
                   <FormControlLabel
@@ -329,7 +330,7 @@ export default function UserEdit() {
               <>
                 <Grid item xs={12} sm={6}>
                   <PasswordInput
-                    fieldId={'pass_' + data.userId}
+                    fieldId={'pass_' + info.userId}
                     onChange={handlePassChange('password')}
                     className={formClasses.formControl}
                     validation="rules"
@@ -337,11 +338,11 @@ export default function UserEdit() {
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <PasswordInput
-                    fieldId={'pass-rep_' + data.userId}
+                    fieldId={'pass-rep_' + info.userId}
                     onChange={handlePassChange('passwordRepeat')}
                     className={formClasses.formControl}
                     validation="repeat"
-                    original={data.password}
+                    original={info.password}
                     label="Repeat Password"
                   />
                 </Grid>

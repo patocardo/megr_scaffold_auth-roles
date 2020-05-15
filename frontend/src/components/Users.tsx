@@ -1,8 +1,7 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
 import {
   Box,
-  Button,
   Container,
   TextField,
   FormControl,
@@ -10,33 +9,24 @@ import {
   InputAdornment,
   Select,
   MenuItem,
-  Dialog ,
-  DialogActions ,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  List,
-  ListItem,
-  ListItemText
 } from '@material-ui/core';
 import SearchIcon from '@material-ui/icons/Search';
-import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
-import useCummulativeDelay from '../utils/use-delay';
+import { isEqual } from 'lodash';
+import { useDebounce } from 'use-debounce';
 import DataWrapper from './DataWrapper';
 import useGraphQL from '../utils/use-graphql';
 import EnhancedTable from './EnhancedTable';
-import BannerAlert from './BannerAlert';
-import { ErrorType, hasErrors } from '../globals/error-handling';
-import { StateContext } from '../globals/context';
+import { BannerError } from '../globals/error-handling';
+import usePrevious from '../utils/use-previous';
+import useMultipleDelete from '../utils/use-multiple-delete';
 import useFormStyles from '../utils/use-form-styles';
-import keyGenerate from '../utils/string';
 
 type FilterType = {
   search: string,
   roleId: string
 }
 
-type userDataType = {
+type UserDataType = {
   userId: string,
   name: string,
   email: string,
@@ -46,34 +36,16 @@ type userDataType = {
   }[]
 }
 
-type usersDataType = {
-  users: userDataType[]
-}
-
-type UsersRemoveReturnType = {
-  usersRemove: number
-}
-
-type userType = {
+type UserDisplayType = {
   userId: string,
   name: string,
   email: string,
   roles: string
 }
 
-type roleType = {
+type RoleType = {
   roleId: string,
   name: string
-}
-
-type rolesDataType = {
-  roles: roleType[]
-}
-
-type PrepareDeleteType = {
-  confirm: number,
-  ids: string[],
-  usersText: string[]
 }
 
 const initialFilter: FilterType = {
@@ -97,18 +69,6 @@ function makeListExpression(filter: FilterType): string {
   `;
 }
 
-function getDeletionStrings(usersText: string[], future: boolean = false): string[] {
-  const verb = (future) ? ' are marked for delete': ' has been deleted';
-  return (usersText.length === 0)
-    ? ['There is no item selected for removal']
-    : (usersText.length < 11)
-      ? [`The following users ${verb}:`, 
-        ...usersText]
-      : [`${usersText.length} users ${verb}`];
-}
-
-const noneDelete: PrepareDeleteType = {confirm: 0, ids: [], usersText: []};
-
 const headCells = [
   {
     disablePadding: false,
@@ -130,87 +90,64 @@ const headCells = [
   }
 ];
 
+
 export default function Users() {
-  const [usersDisplay, setUsersDisplay] = useState<userType[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  // const [errors, setErrors] = useState<ErrorType[] | null>(null);
+  const [usersDisplay, setUsersDisplay] = useState<UserDisplayType[]>([]);
   const [filter, setFilter] = useState(initialFilter);
-  const setDelayFilter = useCummulativeDelay(10000);
-  const deletedData = useGraphQL<UsersRemoveReturnType>('post');
-  const usersData = useGraphQL<usersDataType>('post');
-  const rolesData = useGraphQL<rolesDataType>('post');
-  const { state, dispatch } = useContext(StateContext);
+  const [debouncedFilter] = useDebounce(filter, 1000);
+  const { data, errors, fetchData} = useGraphQL<UserDataType[] | null>(null);
+  const prevUserData = usePrevious(data);
+  const { data: rolesData, errors: rolesError, fetchData: fetchRoles } = useGraphQL<RoleType[]>([]);
   const classes = useFormStyles();
   const [searchText, setSearchText] = useState('');
-  const [prepareDelete, setPrepareDelete] = useState<PrepareDeleteType>(noneDelete);
   const history = useHistory();
+  const mounted = useRef(false);
+  const {MultiDelCompo, handleDelete} = useMultipleDelete({
+    resolver: 'usersRemove',
+    collection: data || [],
+    getId: (user: UserDataType) => user.userId,
+    getItemText: (user: UserDataType) => `${user.name}<${user.email}>`,
+    modelNames: 'users'
+  });
 
   useEffect(() => {
-    rolesData.fetchData(`
-      query {
+    if(!mounted.current) {
+      fetchRoles( { expression: `query {
         roles {
           roleId: _id
           name
         }
-      }
-    `, true);
-    usersData.fetchData(makeListExpression(filter), true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      }`, isAuth: true});
+      fetchData({ expression: makeListExpression(initialFilter), isAuth: true});  
+      mounted.current = true;
+    }
+  }, [fetchRoles, fetchData]);
 
   useEffect(() => {
-    usersData.fetchData(makeListExpression(filter), true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter]);
+    fetchData({ expression: makeListExpression(debouncedFilter), isAuth: true});
+  }, [debouncedFilter, fetchData]);
 
   useEffect(() => {
-    if (usersData.result) {
-      setIsLoading(false);
-      const { data, token } = usersData.result;
-      if ( data && data?.users?.length > 0) {
-        const newUsers: userType[] = data.users.map(user => ({
+    if (!isEqual(data, prevUserData)) {
+      const newUsers: UserDisplayType[] = (data === null)
+        ? []
+        : data.map((user: UserDataType) => ({
           ...user,
-          roles: user.roles.map(role => role.name).join(', ')
+          roles: user.roles.map((role) => role.name).join(', ')
         }));
-        setUsersDisplay(newUsers)
-      }
-      if( token && state.loginInfo?.email) {
-        dispatch({ type: 'SIGNEDIN', payload: { loginInfo: { email: state.loginInfo.email, token} }});
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersData.result]);
 
-  useEffect(() => {
-    setDelayFilter(() => {
-      setFilter({...filter, search: searchText})
-    });
-  }, [searchText]);
-
-  useEffect(() => {
-    if(prepareDelete.confirm === 2 && prepareDelete.ids.length > 0) {
-      const cargo = `
-        mutation {
-          usersRemove(ids: ["${prepareDelete.ids.join('", "')}"])
-        }
-      `;
-      deletedData.fetchData(cargo, true);
+      setUsersDisplay(newUsers);
     }
-  }, [prepareDelete.confirm]);
 
-  useEffect(() => {
-    if(deletedData?.result && deletedData?.result.data?.usersRemove) {
-      // TODO: check integrity
-      usersData.fetchData(makeListExpression(filter), true);
-    }
-  }, [deletedData.result])
+  }, [data, prevUserData]);
 
   function handleSearch(evt: React.ChangeEvent<{ value: string }>) {
     setSearchText(evt.target.value);
+    setFilter({...filter, search: evt.target.value})
   }
 
   function handleRole(evt: React.ChangeEvent<{ value: unknown }>) {
-    setDelayFilter(() => setFilter({...filter, roleId: evt.target.value as string}));
+    setFilter({...filter, roleId: evt.target.value as string});
   }
 
   function handleEdit(id: string) {
@@ -221,85 +158,13 @@ export default function Users() {
     history.push('/user/_');
   }
 
-  function handleDelete(ids: string[]) {
-    if (!usersData?.result?.data?.users) return;
-    const usersText = usersData.result.data.users.filter(user => {
-      return ids.includes(user.userId);
-    }).map(user => `${user.name}<${user.email}`);
-    setPrepareDelete({confirm: 1, ids, usersText});
-  }
-
-  function hasDeleted(): boolean {
-    return (
-      deletedData.result &&
-      deletedData.result.data &&
-      deletedData.result.data.usersRemove
-    ) ? true : false;
-  }
-
-  const roles = rolesData?.result?.data?.roles || [];
-
-  const bodyBannerDeleted = (!deletedData.result?.data) ? '' : getDeletionStrings(prepareDelete.usersText);
-
-  const toDeleteContent = (usersData?.result?.data?.users)
-    ? getDeletionStrings(prepareDelete.usersText, true)
-    : [];
-  
-
   return (
     <Container>
-     <Dialog
-        open={prepareDelete.confirm === 1}
-        onClose={() => setPrepareDelete(noneDelete)}
-        aria-labelledby="alert-dialog-title"
-        aria-describedby="alert-dialog-description"
-      >
-        <DialogTitle id="alert-dialog-title">{"Do you want to permanently remove users?"}</DialogTitle>
-        <DialogContent>
-          <DialogContentText id="alert-dialog-description" component='div'>
-            <List dense={true}>
-              {toDeleteContent.map((line) => (
-                <ListItem key={keyGenerate(line, 10)}>
-                  <ListItemText
-                    primary={line}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setPrepareDelete({...prepareDelete, confirm: 0})}
-            color="secondary"
-            variant="contained"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => setPrepareDelete({...prepareDelete, confirm: 2})}
-            variant="contained"
-            color="primary" 
-            autoFocus
-          >
-            Confirm delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <BannerAlert
-        severity="success"
-        isOpen={hasDeleted() && prepareDelete.confirm === 2}
-        closeFn={() => setPrepareDelete(noneDelete)}
-        title="Users successfully deleted"
-        body={bodyBannerDeleted}
-      />
-      <BannerAlert
-        severity="error"
-        isOpen={hasErrors(deletedData.errors) && prepareDelete.confirm === 2}
-        closeFn={() => setPrepareDelete(noneDelete)}
-        title="Error while deleting records of users"
-        body={deletedData.errors || 'Server error'}
-      />
+     <MultiDelCompo />
+      <BannerError
+        message={`Error while fetching records of Users`}
+        errors={[errors, rolesError]}
+      /> 
       <Box>
         <FormControl variant="outlined" className={classes.formControl}>
           <TextField
@@ -323,7 +188,7 @@ export default function Users() {
           />
         </FormControl>
         {
-          roles.length > 0 && (
+          Array.isArray(rolesData) && rolesData.length > 0 && (
             <FormControl variant="outlined" className={classes.formControl}>
               <InputLabel id="filter-role-label" className={classes.marginedTop}>Role</InputLabel>
               <Select
@@ -335,17 +200,19 @@ export default function Users() {
                 className={classes.marginedTop}
               >
                 <MenuItem value="">
-                  <em>None</em>
+                  <em>All</em>
                 </MenuItem>
                 {
-                  roles.map(role => (<MenuItem value={role.roleId} key={role.roleId}>{role.name}</MenuItem>))
+                  Array.isArray(rolesData) && rolesData.map((role: RoleType) => {
+                    return(<MenuItem value={role.roleId} key={role.roleId}>{role.name}</MenuItem>);
+                  })
                 }
               </Select>
             </FormControl>
           )
         }
       </Box>
-      <DataWrapper isEmpty={usersDisplay.length === 0} isLoading={isLoading}>
+      <DataWrapper<UserDataType> items={data}>
         <EnhancedTable
           headCells={headCells}
           rows={usersDisplay}

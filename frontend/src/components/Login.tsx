@@ -16,10 +16,11 @@ import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import { makeStyles, createStyles, Theme } from '@material-ui/core/styles';
 
 import { validate } from 'email-validator';
-
+import PasswordInput from './PasswordInput';
 import { StateContext } from '../globals/context';
-import { ErrorType, logError, hasErrors } from '../globals/error-handling';
+import { BannerError } from '../globals/error-handling';
 import useLogIn, { useLogOut } from '../utils/use-auth';
+import { getRemaining } from '../utils/times';
 
 function Copyright() {
   return (
@@ -67,59 +68,31 @@ const useStyles = makeStyles((theme: Theme) => createStyles({
 }));
 
 export default function Login() {
-  const [status, setStatus] = useState('loggedout');
+  const [status, setStatus] = useState<'in'|'out'|'submit'|'leaving'>('out');
   const [userData, setUserData] = useState({ email: '', password: '', remember: false });
   const [isValidEmail, setIsValidEmail] = useState(true);
-  const [responseError, setResponseError] = useState<ErrorType[]|boolean>(false);
-  const [ toSubmit, setToSubmit ] = useState(false);
-  const [ toOut, setToOut ] = useState(false);
-  const { state } = useContext(StateContext);
-  const { success, errors: loginErrors, logIn } = useLogIn();
-  const { success: out, errors: logoutErrors, logOut } = useLogOut();
+  const [isValidPassword, setIsValidPassword] = useState(true);
+  const { contextState } = useContext(StateContext);
+  const { loginErrors, logIn } = useLogIn();
+  const {logOutErrors, logOut} = useLogOut();
   const classes = useStyles();
   let internal = (<div></div>);
 
   useEffect(() => {
-    if(state && state.loginInfo?.token) {
-      setStatus('logged');
-    }
-  }, []);
-
-  useEffect(() => {
-            // TODO: refine possible errors
-
-  }, [loginErrors]);
-
-  useEffect(() => {
-    if(success) setStatus('logged');
-  }, [success]);
-
-  useEffect(() => {
-    if(out) setStatus('logged');
-  }, [out]);
-
-  useEffect(() => {
-    // TODO: usePassword
-    if (toSubmit && validate(userData.email) && userData.password.length > 3) {
-      setStatus('submitting');
-      logIn(userData.email, userData.password, userData.remember);
-    }
-  }, [toSubmit]);
-
-  useEffect(() => {
-    if (toOut) {
-      setStatus('leaving');
-      logOut();
-    }
-  }, [toOut]);
+    const situation = (
+      contextState.token.length > 3 &&
+      getRemaining(contextState.expiration) > 0
+    ) ? 'in' : 'out';
+    setStatus(situation);
+  }, [contextState.token, contextState.expiration]);
 
   function handleEmail(evt: React.ChangeEvent<HTMLInputElement>) {
     const email = evt.target.value;
     setIsValidEmail(validate(email));
     setUserData({ ...userData, email });
   }
-  function handlePassword(evt: React.ChangeEvent<HTMLInputElement>) {
-    const password = evt.target.value;
+  function handlePassword(password: string, isValid: boolean) {
+    setIsValidPassword(!isValid);
     setUserData({ ...userData, password });
   }
   function handleRemember(evt: React.ChangeEvent<HTMLInputElement>) {
@@ -128,33 +101,39 @@ export default function Login() {
 
   function submit(evt: React.MouseEvent) {
     evt.preventDefault();
-    setToSubmit(true);
+    if (isValidEmail && true /* isValidPassword */) {
+      setStatus('submit');
+      logIn(userData);
+    }
   }
 
   function toLogout(evt: React.MouseEvent) {
     evt.preventDefault();
-    setToOut(true);
+    setStatus('leaving');
+    logOut(true);
   }
 
   switch (status) {
-    case 'submitting':
+    case 'submit':
       internal = (
         <div>
-          <CircularProgress />
-          <Typography component="h1" variant="h5">
+          <Box display="flex" justifyContent="center">
+            <CircularProgress size={80}/>
+          </Box>  
+          <Typography component="h1" variant="h5" align="center">
             Sending user&#39;s data
           </Typography>
         </div>
       );
       break;
-    case 'logged':
+    case 'in':
       internal = (
         <div>
           <Typography component="h1" variant="h5">
             Welcome
           </Typography>
           <Typography component="h1" variant="h4">
-            { state?.loginInfo?.email }
+            { contextState.email }
           </Typography>
           <Button
             type="button"
@@ -164,7 +143,7 @@ export default function Login() {
             className={classes.submit}
             onClick={toLogout}
           >
-            Sign Oout
+            Sign Out
           </Button>
         </div>
       );
@@ -175,15 +154,12 @@ export default function Login() {
           <Typography component="h1" variant="h5">
             Sign in
           </Typography>
-          { Array.isArray(responseError) && responseError.length > 0 && (
-              <ul>
-                {responseError?.map((err) => (<li key={err.key}>{err.message}</li>))}
-              </ul>
-            )
-          }
+          <BannerError
+            message={`Error while trying to log`}
+            errors={[loginErrors, logOutErrors]}
+          />
           <form className={classes.form} noValidate>
             <TextField
-              variant="outlined"
               margin="normal"
               required
               fullWidth
@@ -197,18 +173,10 @@ export default function Login() {
               error={!isValidEmail}
               helperText={!isValidEmail && 'Invalid email'}
             />
-            <TextField
-              variant="outlined"
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
+            <PasswordInput
+              fieldId={'pass_login'}
               onChange={handlePassword}
-              value={userData.password}
+              validation="none"
             />
             <FormControlLabel
               control={<Checkbox value="remember" color="primary" checked={userData.remember} onChange={handleRemember} />}

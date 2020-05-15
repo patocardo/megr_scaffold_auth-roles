@@ -1,127 +1,157 @@
-import /*React, */{ useState, useEffect, useContext, useRef } from 'react';
-import { ErrorType } from '../globals/error-handling';
+import { useEffect, useContext, useState, SetStateAction, Dispatch, useRef } from 'react';
+import { ErrorType, mapJSError } from '../globals/error-handling';
 import { StateContext } from '../globals/context';
-import { DispatchType, IloginInfo } from '../globals/reducer';
-import useGraphQL, { useGraphQL2 } from './use-graphql';
+import useGraphQL, { fetchGraphQl } from './use-graphql';
+// import { invalidRules } from '../components/PasswordInput'; //use It for re-check password validity before api request
+import useEffectDeep from '../utils/use-effect-deep';
 
-
-type LogInReturnType = {
-  errors: ErrorType[] | null,
-  success: boolean,
-  logIn: (email: string, password: string, remember: boolean) => void
+export type LogInPropsType = {
+  email: string,
+  password: string,
+  remember: boolean
 }
+type LogInReturnType = {
+  loginErrors: ErrorType[] | null,
+  logIn: Dispatch<SetStateAction<LogInPropsType>>
+};
 
 type LoginDataType = {
-  login: {
-    token: string
-  }
+  token: string,
+  expiration: number
 }
 
 export default function useLogIn(): LogInReturnType {
-  const [userData, setUserData] = useState({email: '', remember: false});
-  const [success, setSuccess] = useState(false);
-  const { result, errors, fetchData } = useGraphQL<LoginDataType>();
-  const { dispatch } = useContext(StateContext);
+  const { contextState, contextDispatch } = useContext(StateContext);
+  const [ loginData, logIn] = useState<LogInPropsType>({email: '', password: '', remember: false});
+  const [ loginErrors, setLoginErrors ] = useState<ErrorType[]>([]);
+  const newToken = useRef('');
 
-  function logIn(email: string, password: string, remember: boolean): void {
-    const cargo = `
-      query {
-        login(email: "${email}", password: "${password}", remember: ${remember}) {
-          token
-        }
-      }
-    `;
-    setUserData({ email, remember });
-    fetchData(cargo);
-  }
   useEffect(() => {
-    const token = result ? result?.data?.login?.token : null;
-    if (token) {
-
-      const loginInfo = { token, email: userData.email };
-
-      if (userData.remember) {
-        localStorage.setItem('token', token);
-      } else {
-        sessionStorage.setItem('token', token);
+    (async () => {
+      try {
+        if(
+          loginData.email.length > 4 &&
+          loginData.password.length > 3 /* &&
+          ( newToken.current === '' ||
+          contextState.token !== newToken.current) */ // prevent infinite loop
+        ){
+          const expression = `
+            query {
+              login(email: "${loginData.email}", password: "${loginData.password}", remember: ${loginData.remember.toString()}) {
+                token
+                expiration
+              }
+            }
+          `;
+          const data = await fetchGraphQl<LoginDataType>({ expression });
+          if (data && data.token?.length > 3) {
+            const payload = {...data, email: loginData.email };
+            if (loginData.remember) {
+              localStorage.setItem('token', data.token);
+            } else {
+              sessionStorage.setItem('token', data.token);
+            }
+            newToken.current = data.token;
+            contextDispatch({ type: 'SIGNEDIN', payload});
+            logIn(prev => ({...prev, email: ''}));
+          }          
+        }
+      } catch(err) {
+        setLoginErrors([mapJSError(err)]);
       }
+    })();
 
-      dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
+  },[loginData.email, loginData.password, loginData.remember, contextDispatch])
 
-      setSuccess(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result]);
-  return { success, errors, logIn}
+  return {loginErrors, logIn};
 }
 
 type CheckIsAliveReturnType = {
-  errors: ErrorType[] | null,
-  email: string | null,
-  checkIsAlive: () => void
+  email: string,
+  expiration: number,
+  token: string,
+  remember: boolean
 }
 
-type CheckIsDataType = {
-  tokenIsAlive: {
-    email: string
-  }
+type IsAliveResponseType = {
+  email: string,
+  expiration: number,
+  remember: boolean
+}
+const deadToken = {email: '', token: '', expiration: 0, remember: false};
+
+export async function checkIsAlive(currentToken?: string): Promise<CheckIsAliveReturnType> {
+  const token: string | null = currentToken || sessionStorage.getItem('token') || localStorage.getItem('token');
+  if (!token) return Promise.resolve(deadToken);
+  const expression = `query {
+    tokenIsAlive(token: "${token}") {
+      email,
+      expiration,
+      remember
+    }
+  }`;
+  const data = await fetchGraphQl<IsAliveResponseType>({expression, token});
+  return !!data?.email ? { ...data, token} : deadToken;
 }
 
-type CheckIsAliveType = () => void;
-
-type CheckIsAliveInputType = {
-  loginInfo: IloginInfo | null,
-  dispatch: DispatchType,
-  setErrors: (newErrors: ErrorType[]) => void
+type UseRefreshReturnType = {
+  refreshErrors: ErrorType[] | null,
+  refreshToken: Dispatch<SetStateAction<boolean>>
 }
 
-export function useCheckIsAlive(args: CheckIsAliveInputType): CheckIsAliveType {
-  const { loginInfo, dispatch, setErrors } = args;
-  const token = useRef('');
-  const { data, fetchData } = useGraphQL2<CheckIsDataType | null>({ setErrors });
-
-  function checkIsAlive(): void {
-    const storedToken: string | null = loginInfo?.token || sessionStorage.getItem('token') || localStorage.getItem('token');
-    if (!storedToken) return;
-    const cargo = `
-      query {
-        tokenIsAlive(token: "${storedToken}") {
-          email
-        }
-      }
-    `;
-    token.current = storedToken;
-    fetchData(cargo);
-  }
+export function useRefreshToken(): UseRefreshReturnType {
+  const { data, errors, fetchData} = useGraphQL<LoginDataType>({token: '', expiration: 0});
+  const { contextState, contextDispatch } = useContext(StateContext);
+  const [ doRefresh, refreshToken] = useState(false);
 
   useEffect(() => {
-    if(data && token.current && data?.tokenIsAlive?.email) {
-      const loginInfo = { token: token.current, email: data.tokenIsAlive.email };
-
-      dispatch({ type: 'SIGNEDIN', payload: { loginInfo }});
+    if(doRefresh) {
+      const token: string | null = contextState.token || sessionStorage.getItem('token') || localStorage.getItem('token');
+      if (!token) return;
+      const expression = `query { 
+        refreshToken(token: "${token}") {
+          token
+          expiration
+        } 
+      }`;
+      fetchData({expression, isAuth: true});
+      refreshToken(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [doRefresh, contextState.token, fetchData])
 
-  return checkIsAlive;
+  useEffectDeep(() => {
+    if (data && data?.token.length > 3) {
+      const payload = {...data, email: contextState.email };
+
+      if (contextState.remember) {
+        localStorage.setItem('token', data.token);
+      } else {
+        sessionStorage.setItem('token', data.token);
+      }
+
+      contextDispatch({ type: 'REFRESHEDTOKEN', payload});
+    }
+  }, [data, contextDispatch, contextState.email, contextState.remember]);
+
+  return {refreshErrors: errors, refreshToken};
 }
 
 type LogOutReturnType = {
-  errors: ErrorType[] | null,
-  success: boolean,
-  logOut: () => void
-}
+  logOutErrors: ErrorType[] | null,
+  logOut: Dispatch<SetStateAction<boolean>>
+};
 
 export function useLogOut(): LogOutReturnType  {
-  const { dispatch } = useContext(StateContext);
-  const [ success, setSuccess ] = useState(false);
+  const { contextDispatch } = useContext(StateContext);
+  const [ doLogOut, logOut] = useState(false);
 
-  function logOut(): void {
-    localStorage.removeItem('token');
-    sessionStorage.removeItem('token');
-    dispatch({ type: 'SIGNEDOUT'});
-    setSuccess(true);
-  }
+  useEffect(() => {
+    if(doLogOut){
+      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      contextDispatch({ type: 'SIGNEDOUT'});
+    }
+  }, [doLogOut, contextDispatch])
 
-  return { errors: null, success, logOut };
+  return {logOutErrors: null, logOut};
 }

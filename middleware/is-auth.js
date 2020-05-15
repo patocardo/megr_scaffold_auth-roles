@@ -18,10 +18,5 @@ module.exports = function isAuth(req, res, next) {
 
   req.isAuth = true;
   req.userData = { userId: decodedToken.userId, email: decodedToken.email, remember: decodedToken.remember};
-  res.newToken = jwt.sign(
-    {...req.userData},
-    process.env.JWT_SECRET,
-    {expiresIn: decodedToken.remember ? '7d' : '1h'}
-  );
   next();
 }

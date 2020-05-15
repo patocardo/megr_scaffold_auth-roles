@@ -24,7 +24,7 @@ type severityType = 'info' | 'success' | 'warning' | 'error';
 type AlertPropsType = {
   isOpen: boolean,
   severity: severityType,
-  closeFn: (...args: any) => any,
+  closeFn?: (...args: any) => any,
   title: string,
   body: string | string[] | ErrorType[]
 }
@@ -79,15 +79,19 @@ function BannerAlert(props: AlertPropsType) {
           <Grid item xs={1}>
             <IconBanner severity={severity} alertIcon={classes.alertIcon} />
           </Grid>
-          <Grid item xs={10}>
+          <Grid item xs={(typeof closeFn !== 'undefined') ? 10: 11}>
             <Typography variant="h4">{title}</Typography>
             {bodyToShow}
           </Grid>
-          <Grid item xs={1}>
-            <IconButton onClick={closeFn} color="primary" aria-label="close">
-              <CloseIcon />
-            </IconButton>
-          </Grid>
+          {
+            (typeof closeFn !== 'undefined') && (
+              <Grid item xs={1}>
+                <IconButton onClick={closeFn} color="primary" aria-label="close">
+                  <CloseIcon />
+                </IconButton>
+              </Grid>              
+            ) 
+          }
         </Grid>
       </Box>
     </Collapse> 

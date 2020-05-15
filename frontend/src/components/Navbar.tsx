@@ -1,10 +1,11 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import clsx from 'clsx';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useHistory } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, CssBaseline, useScrollTrigger, Button, IconButton,
   Drawer, List, ListItem, ListItemText } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
+import { useLogOut } from '../utils/use-auth';
 
 import { StateContext } from '../globals/context';
 
@@ -66,18 +67,15 @@ function ElevationScroll(props: ElevationScrollProps) {
   });
 }
 
+const outTargets = [{label:'Login', key: 'login'}];
+
 export default function NavBar(props: ElevationScrollProps) {
-  const { state } = useContext(StateContext);
-
-  const { loginInfo } = state;
-
-  const targets = loginInfo
-    ? [{label: 'Home', key:'login'}, {label: 'Users', key: 'users'}, {label: 'Roles', key: 'roles'}]
-    : [{label:'Login', key: 'login'}];
-
-
   const classes = useStyles();
-  const [isOpen, setIsOpen] = React.useState(false);
+  const { contextState } = useContext(StateContext);
+  const [isOpen, setIsOpen] = useState(false);
+  const [targets, setTargets] = useState(outTargets);
+  const history = useHistory();
+  const {logOut} = useLogOut();
 
   const toggleDrawer = (open: boolean) => (event: React.KeyboardEvent | React.MouseEvent) => {
     if (
@@ -86,9 +84,20 @@ export default function NavBar(props: ElevationScrollProps) {
     ) {
       return;
     }
-
     setIsOpen(open);
   }
+
+  function signOut() {
+    logOut(true);
+    history.push('/');
+  }
+ 
+  useEffect(() => {
+    setTargets(contextState.token.length > 3
+      ? [{label: 'Home', key:''}, {label: 'Users', key: 'users'}, {label: 'Roles', key: 'roles'}]
+      : outTargets
+    );
+  }, [contextState.token]);
 
   return (
     <React.Fragment>
@@ -103,12 +112,23 @@ export default function NavBar(props: ElevationScrollProps) {
             <div className={classes.topMenu}>
               {targets.map((elm) =>
                 (
-                  <NavLink to={`/${elm.key}`} key={elm.key} className={classes.navlink}>
+                  <NavLink to={`/${elm.key}`} key={elm.label} className={classes.navlink}>
                     <Button color="primary" classes={{
                       root: classes.buttonRoot
                     }}>{elm.label}</Button>
                   </NavLink>
                 ))
+              }
+              {
+                 contextState.token.length > 3 && (
+                  <Button
+                    color="primary" 
+                    classes={{ root: classes.buttonRoot }}
+                    onClick={signOut}
+                  >
+                    Log Out
+                  </Button>                  
+                )
               }
             </div>
           </Toolbar>
