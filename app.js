@@ -28,7 +28,7 @@ app.use(bodyParser.json());
 app.use(cors());
 
 app.get('/', (req, res, next) => {
-  res.send('Hola tipo');
+  res.render('./frontend/index.html');
 });
 
 app.use(isAuth);
