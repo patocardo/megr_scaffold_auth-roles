@@ -12,8 +12,6 @@
 ## TODOS
 - Sistem
   - Redirection login to private home page
-  - Multi-platform Icons
-  - Manifiest
   - Performance optimization
 - Security
   - Canceling jw-token

@@ -1,0 +1,2 @@
+(this.webpackJsonpfrontend=this.webpackJsonpfrontend||[]).push([[12],{216:function(e,t,n){"use strict";n.r(t),n.d(t,"default",(function(){return i}));var o=n(0),r=n.n(o),a=n(42),s=n(92),u=n(63);function i(e){return r.a.createElement(r.a.Fragment,null,r.a.createElement(u.a,{severity:"error",isOpen:!0,title:"404 - Not Found",body:"The route you are asking doesn't exists or you don't have authorization to access there"}),r.a.createElement(s.a,{justifyContent:"center",p:2},r.a.createElement(a.b,{to:"/"},"Go To Home")))}}}]);
+//# sourceMappingURL=12.a83001b5.chunk.js.map

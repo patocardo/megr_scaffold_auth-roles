@@ -21,7 +21,7 @@ type LoginDataType = {
 }
 
 export default function useLogIn(): LogInReturnType {
-  const { contextState, contextDispatch } = useContext(StateContext);
+  const { contextDispatch } = useContext(StateContext);
   const [ loginData, logIn] = useState<LogInPropsType>({email: '', password: '', remember: false});
   const [ loginErrors, setLoginErrors ] = useState<ErrorType[]>([]);
   const newToken = useRef('');
@@ -31,9 +31,7 @@ export default function useLogIn(): LogInReturnType {
       try {
         if(
           loginData.email.length > 4 &&
-          loginData.password.length > 3 /* &&
-          ( newToken.current === '' ||
-          contextState.token !== newToken.current) */ // prevent infinite loop
+          loginData.password.length > 3
         ){
           const expression = `
             query {
